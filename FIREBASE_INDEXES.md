@@ -62,8 +62,8 @@ Fields:
 {
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": [
-      {
+  "indexes": [
+    {
         "collectionGroup": "contratos",
         "queryScope": "COLLECTION",
         "fields": [
@@ -74,8 +74,8 @@ Fields:
       },
       {
         "collectionGroup": "itinerarios", 
-        "queryScope": "COLLECTION",
-        "fields": [
+      "queryScope": "COLLECTION",
+      "fields": [
           {"fieldPath": "regionalId", "order": "ASCENDING"},
           {"fieldPath": "turno", "order": "ASCENDING"},
           {"fieldPath": "itinerario", "order": "ASCENDING"}

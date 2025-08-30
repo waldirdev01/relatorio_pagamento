@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../models/regional.dart';
+import '../services/auth_service.dart';
 import 'atividades_extracurriculares_screen.dart';
 import 'contratos_screen.dart';
 import 'escolas_screen.dart';
 import 'itinerarios_screen.dart';
+import 'login_screen.dart';
 import 'selecionar_contrato_screen.dart';
 import 'selecionar_contrato_totalizador_screen.dart';
 
 class RegionalHomeScreen extends StatelessWidget {
   final Regional regional;
 
-  const RegionalHomeScreen({super.key, required this.regional});
+  RegionalHomeScreen({super.key, required this.regional});
+
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +27,13 @@ class RegionalHomeScreen extends StatelessWidget {
         title: Text(regional.descricao),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => _fazerLogout(context),
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sair',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -275,5 +286,26 @@ class RegionalHomeScreen extends StatelessWidget {
             SelecionarContratoTotalizadorScreen(regional: regional),
       ),
     );
+  }
+
+  Future<void> _fazerLogout(BuildContext context) async {
+    try {
+      await _authService.fazerLogout();
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao sair: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
