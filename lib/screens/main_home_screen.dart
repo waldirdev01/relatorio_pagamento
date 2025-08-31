@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'gerenciar_usuarios_screen.dart';
 import 'login_screen.dart';
 import 'regionais_screen.dart';
+import 'relatorios_globais_screen.dart';
 
 class MainHomeScreen extends StatelessWidget {
   MainHomeScreen({super.key});
@@ -137,8 +138,8 @@ class MainHomeScreen extends StatelessWidget {
                   context,
                   icon: Icons.analytics,
                   title: 'Relatórios Globais',
-                  subtitle: 'Visão geral dos relatórios',
-                  onTap: () => _showNotImplemented(context),
+                  subtitle: 'Estatísticas da Secretaria de Educação',
+                  onTap: () => _navigateToRelatoriosGlobais(context),
                 ),
               ],
             ),
@@ -208,6 +209,12 @@ class MainHomeScreen extends StatelessWidget {
   void _navigateToGerenciarUsuarios(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const GerenciarUsuariosScreen()),
+    );
+  }
+
+  void _navigateToRelatoriosGlobais(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const RelatoriosGlobaisScreen()),
     );
   }
 

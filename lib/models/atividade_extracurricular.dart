@@ -34,7 +34,7 @@ class AtividadeExtracurricular {
   final int? ei; // Ensino Infantil
   final int? ef; // Ensino Fundamental
   final int? em; // Ensino Médio
-  final int? ee; // Escola Estadual
+  final int? ee; // Educação Especial
   final int? eja; // Educação de Jovens e Adultos
   final int total;
 

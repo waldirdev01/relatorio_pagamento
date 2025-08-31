@@ -113,13 +113,49 @@ class TotalizadorService {
       'EJA': totalEja,
     };
 
-    // Calcular alunos por turno (assumindo que todos são matutinos por enquanto)
-    final alunosPorTurno = {
-      'M': totalAlunos, // Todos os alunos são matutinos por enquanto
-      'V': 0,
-      'N': 0,
-      'INT': 0,
-    };
+    // Calcular alunos por turno usando dados reais
+    final alunosPorTurno = <String, int>{'M': 0, 'V': 0, 'N': 0, 'INT': 0};
+
+    for (final i in itinerariosMes) {
+      final alunosItinerario =
+          (i.ei ?? 0) + (i.ef ?? 0) + (i.em ?? 0) + (i.ee ?? 0) + (i.eja ?? 0);
+      switch (i.turno) {
+        case TipoTurno.matutino:
+          alunosPorTurno['M'] = (alunosPorTurno['M'] ?? 0) + alunosItinerario;
+          break;
+        case TipoTurno.vespertino:
+          alunosPorTurno['V'] = (alunosPorTurno['V'] ?? 0) + alunosItinerario;
+          break;
+        case TipoTurno.noturno:
+          alunosPorTurno['N'] = (alunosPorTurno['N'] ?? 0) + alunosItinerario;
+          break;
+        case TipoTurno.integral:
+          alunosPorTurno['INT'] =
+              (alunosPorTurno['INT'] ?? 0) + alunosItinerario;
+          break;
+      }
+    }
+
+    // Adicionar alunos das atividades extracurriculares
+    for (final a in atividades) {
+      final alunosAtividade =
+          (a.ei ?? 0) + (a.ef ?? 0) + (a.em ?? 0) + (a.ee ?? 0) + (a.eja ?? 0);
+      switch (a.turno) {
+        case TipoTurno.matutino:
+          alunosPorTurno['M'] = (alunosPorTurno['M'] ?? 0) + alunosAtividade;
+          break;
+        case TipoTurno.vespertino:
+          alunosPorTurno['V'] = (alunosPorTurno['V'] ?? 0) + alunosAtividade;
+          break;
+        case TipoTurno.noturno:
+          alunosPorTurno['N'] = (alunosPorTurno['N'] ?? 0) + alunosAtividade;
+          break;
+        case TipoTurno.integral:
+          alunosPorTurno['INT'] =
+              (alunosPorTurno['INT'] ?? 0) + alunosAtividade;
+          break;
+      }
+    }
 
     // Calcular itinerários por turno
     final itinerariosPorTurno = <String, int>{'M': 0, 'V': 0, 'N': 0, 'INT': 0};
