@@ -9,6 +9,7 @@ import '../models/turno.dart';
 import '../services/atividade_extracurricular_service.dart';
 import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
+import '../utils/currency_formatter.dart';
 
 class CadastroAtividadeExtracurricularScreen extends StatefulWidget {
   final Regional regional;
@@ -102,7 +103,14 @@ class _CadastroAtividadeExtracurricularScreenState
         widget.regional.id,
       );
       setState(() {
+        _contratosDisponiveis.clear();
         _contratosDisponiveis.addAll(contratos);
+        // Após carregar os contratos, selecionar o contrato se estivermos editando
+        if (_isEditing && widget.atividade?.contratoId.isNotEmpty == true) {
+          _contratoSelecionado = _contratosDisponiveis
+              .where((c) => c.id == widget.atividade!.contratoId)
+              .firstOrNull;
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -140,13 +148,6 @@ class _CadastroAtividadeExtracurricularScreenState
     final atividade = widget.atividade!;
     _descricaoController.text = atividade.descricao;
     _turnoSelecionado = atividade.turno;
-
-    // Buscar e selecionar o contrato
-    if (atividade.contratoId.isNotEmpty) {
-      _contratoSelecionado = _contratosDisponiveis
-          .where((c) => c.id == atividade.contratoId)
-          .firstOrNull;
-    }
     _statusSelecionado = atividade.status;
     _escolasSelecionadasIds = List.from(atividade.escolaIds);
     _trajetoController.text = atividade.trajeto;
@@ -166,6 +167,9 @@ class _CadastroAtividadeExtracurricularScreenState
     _motoristasController.text = atividade.motoristas;
     _monitorasController.text = atividade.monitoras;
     _observacoesController.text = atividade.observacoes ?? '';
+
+    // A seleção do contrato agora é feita no método _loadContratos()
+    // após os contratos serem carregados
   }
 
   @override
@@ -217,7 +221,7 @@ class _CadastroAtividadeExtracurricularScreenState
                 ),
               ),
               Text(
-                'R\$ ${contrato.valorPorKm.toStringAsFixed(2)}/km',
+                CurrencyFormatter.formatWithUnit(contrato.valorPorKm, 'km'),
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],

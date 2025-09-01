@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/contrato_service.dart';
+import '../utils/currency_formatter.dart';
 import 'totalizador_screen.dart';
 
 class SelecionarContratoTotalizadorScreen extends StatefulWidget {
@@ -99,7 +100,7 @@ class _SelecionarContratoTotalizadorScreenState
                               ),
                             ),
                             subtitle: Text(
-                              'Valor por Km: R\$ ${contrato.valorPorKm.toStringAsFixed(2)}',
+                              'Valor por Km: ${CurrencyFormatter.formatWithUnit(contrato.valorPorKm, 'km')}',
                             ),
                             trailing: const Icon(Icons.arrow_forward_ios),
                             onTap: () => _navegar(contrato),

@@ -1,12 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
-import '../models/atividade_extracurricular.dart';
 import '../models/itinerario.dart';
 import '../models/regional.dart';
-import '../models/reposicao_aula.dart';
+import '../services/atividade_extracurricular_service.dart';
+import '../services/contrato_service.dart';
+import '../services/itinerario_service.dart';
+import '../services/reposicao_aula_service.dart';
+import '../utils/currency_formatter.dart';
 
 class EstatisticasGlobaisService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ContratoService _contratoService = ContratoService();
+  final ItinerarioService _itinerarioService = ItinerarioService();
+  final AtividadeExtracurricularService _atividadeService =
+      AtividadeExtracurricularService();
+  final ReposicaoAulaService _reposicaoService = ReposicaoAulaService();
 
   /// Calcula estatísticas globais para um mês específico
   Future<Map<String, dynamic>> calcularEstatisticasGlobais({
@@ -24,60 +35,7 @@ class EstatisticasGlobaisService {
           .map((doc) => Regional.fromFirestore(doc.data(), doc.id))
           .toList();
 
-      // Buscar todos os itinerários ativos
-      final itinerariosSnapshot = await _firestore
-          .collection('itinerarios')
-          .where('ativo', isEqualTo: true)
-          .get();
-
-      // Buscar todas as atividades extracurriculares
-      final atividadesSnapshot = await _firestore
-          .collection('atividades_extracurriculares')
-          .get();
-
-      // Buscar todas as reposições de aula
-      final reposicoesSnapshot = await _firestore
-          .collection('reposicoes_aula')
-          .get();
-
-      // Converter para objetos
-      final itinerarios = itinerariosSnapshot.docs
-          .map((doc) => Itinerario.fromFirestore(doc.data(), doc.id))
-          .toList();
-
-      final atividades = atividadesSnapshot.docs
-          .map(
-            (doc) => AtividadeExtracurricular.fromFirestore(doc.data(), doc.id),
-          )
-          .toList();
-
-      final reposicoes = reposicoesSnapshot.docs
-          .map((doc) => ReposicaoAula.fromFirestore(doc.data(), doc.id))
-          .toList();
-
-      // Filtrar por mês/ano
-      final itinerariosFiltrados = _filtrarPorMesAno(
-        itinerarios,
-        mes,
-        ano,
-        (item) => item.dataCriacao,
-      );
-
-      final atividadesFiltradas = _filtrarPorMesAno(
-        atividades,
-        mes,
-        ano,
-        (item) => item.dataAtividade ?? item.dataCriacao,
-      );
-
-      final reposicoesFiltradas = _filtrarPorMesAno(
-        reposicoes,
-        mes,
-        ano,
-        (item) => item.dataReposicao ?? item.dataCriacao,
-      );
-
-      // Calcular estatísticas por regional
+      // Calcular estatísticas por regional usando a mesma lógica do totalizador
       final estatisticasPorRegional = <String, Map<String, dynamic>>{};
       Map<String, dynamic> totalGeral = {
         'totalAlunos': 0,
@@ -91,24 +49,15 @@ class EstatisticasGlobaisService {
         'totalAtividadesExtracurriculares': 0,
         'totalReposicoesAula': 0,
         'quilometragemTotal': 0.0,
+        'valorTotalNota': 0.0,
         'placasUnicas': <String>{},
       };
 
       for (final regional in regionais) {
-        final itinerariosRegional = itinerariosFiltrados
-            .where((i) => i.regionalId == regional.id)
-            .toList();
-        final atividadesRegional = atividadesFiltradas
-            .where((a) => a.regionalId == regional.id)
-            .toList();
-        final reposicoesRegional = reposicoesFiltradas
-            .where((r) => r.regionalId == regional.id)
-            .toList();
-
-        final estatisticasRegional = _calcularEstatisticas(
-          itinerariosRegional,
-          atividadesRegional,
-          reposicoesRegional,
+        final estatisticasRegional = await _calcularEstatisticasRegional(
+          regional,
+          mes,
+          ano,
         );
 
         estatisticasPorRegional[regional.id] = {
@@ -135,6 +84,8 @@ class EstatisticasGlobaisService {
             estatisticasRegional['totalReposicoesAula'] as int;
         totalGeral['quilometragemTotal'] +=
             estatisticasRegional['quilometragemTotal'] as double;
+        totalGeral['valorTotalNota'] +=
+            estatisticasRegional['valorTotalNota'] as double;
 
         // Unir placas únicas
         final placasRegionais =
@@ -158,109 +109,149 @@ class EstatisticasGlobaisService {
     }
   }
 
-  /// Filtra uma lista de itens por mês e ano
-  List<T> _filtrarPorMesAno<T>(
-    List<T> itens,
+  /// Calcula estatísticas de uma regional usando a mesma lógica do totalizador
+  Future<Map<String, dynamic>> _calcularEstatisticasRegional(
+    Regional regional,
     int mes,
     int ano,
-    DateTime Function(T) getData,
-  ) {
-    return itens.where((item) {
-      final data = getData(item);
-      return data.month == mes && data.year == ano;
-    }).toList();
-  }
+  ) async {
+    // Buscar todos os contratos da regional
+    final contratos = await _contratoService.buscarContratosPorRegional(
+      regional.id,
+    );
 
-  /// Calcula as estatísticas baseadas nos dados filtrados
-  Map<String, dynamic> _calcularEstatisticas(
-    List<Itinerario> itinerarios,
-    List<AtividadeExtracurricular> atividades,
-    List<ReposicaoAula> reposicoes,
-  ) {
-    // Contar alunos por modalidade
-    int totalAlunos = 0;
-    int totalEnsinoInfantil = 0;
-    int totalEnsinoFundamental = 0;
-    int totalEnsinoMedio = 0;
-    int totalEducacaoEspecial = 0;
-    int totalEja = 0;
+    if (contratos.isEmpty) {
+      return {
+        'totalAlunos': 0,
+        'totalEnsinoInfantil': 0,
+        'totalEnsinoFundamental': 0,
+        'totalEnsinoMedio': 0,
+        'totalEducacaoEspecial': 0,
+        'totalEja': 0,
+        'totalOnibus': 0,
+        'totalItinerarios': 0,
+        'totalAtividadesExtracurriculares': 0,
+        'totalReposicoesAula': 0,
+        'quilometragemTotal': 0.0,
+        'valorTotalNota': 0.0,
+        'placasUnicas': <String>[],
+      };
+    }
 
-    // Contar ônibus únicos (por placa)
-    Set<String> placasUnicas = {};
+    // Agregar dados de todos os contratos
+    final placasUnicas = <String>{};
+    double kmRegularTotal = 0;
+    double kmExtraTotal = 0;
+    int totalEi = 0, totalEf = 0, totalEm = 0, totalEe = 0, totalEja = 0;
+    double valorTotalNota = 0;
+    int totalItinerarios = 0;
+    int totalAtividades = 0;
+    int totalReposicoes = 0;
 
-    // Contar quilometragem total
-    double quilometragemTotal = 0.0;
+    for (final contrato in contratos) {
+      // Buscar dados do contrato
+      final itinerarios = await _itinerarioService
+          .getItinerariosPorContrato(contrato.id)
+          .catchError((e) => <Itinerario>[]);
 
-    // Processar itinerários
-    for (final itinerario in itinerarios) {
-      final itinerarioComTotais = itinerario.calcularTotais();
-      totalAlunos += itinerarioComTotais.total;
-      totalEnsinoInfantil += itinerarioComTotais.ei ?? 0;
-      totalEnsinoFundamental += itinerarioComTotais.ef ?? 0;
-      totalEnsinoMedio += itinerarioComTotais.em ?? 0;
-      totalEducacaoEspecial += itinerarioComTotais.ee ?? 0;
-      totalEja += itinerarioComTotais.eja ?? 0;
+      final atividades = await _atividadeService
+          .getAtividadesPorContratoPeriodo(
+            contratoId: contrato.id,
+            mes: mes,
+            ano: ano,
+          );
 
-      // Adicionar placas únicas
-      if (itinerario.placas.isNotEmpty) {
-        final placas = itinerario.placas.split(RegExp(r'[,;\n]'));
-        for (final placa in placas) {
-          final placaLimpa = placa.trim();
-          if (placaLimpa.isNotEmpty) {
-            placasUnicas.add(placaLimpa);
-          }
-        }
+      final reposicoes = await _reposicaoService
+          .getReposicoesPorContratoPeriodo(
+            contratoId: contrato.id,
+            mes: mes,
+            ano: ano,
+          );
+
+      // Filtrar itinerários por mês/ano
+      final itinerariosMes = itinerarios.where((i) {
+        return i.dataCriacao.month == mes && i.dataCriacao.year == ano;
+      }).toList();
+
+      // Agregações do contrato
+      final placasContrato = <String>{};
+      double kmRegularContrato = 0;
+      double kmExtraContrato = 0;
+      int eiContrato = 0,
+          efContrato = 0,
+          emContrato = 0,
+          eeContrato = 0,
+          ejaContrato = 0;
+
+      for (final i in itinerariosMes) {
+        _adicionarPlacas(placasContrato, i.placas);
+        kmRegularContrato += i.kmXNumeroOnibusXDias;
+        eiContrato += i.ei ?? 0;
+        efContrato += i.ef ?? 0;
+        emContrato += i.em ?? 0;
+        eeContrato += i.ee ?? 0;
+        ejaContrato += i.eja ?? 0;
       }
 
-      // Calcular quilometragem (usando KM x ÔNIBUS x DIAS)
-      quilometragemTotal += itinerario.kmXNumeroOnibusXDias;
-    }
-
-    // Processar atividades extracurriculares
-    for (final atividade in atividades) {
-      final atividadeComTotais = atividade.calcularTotais();
-      totalAlunos += atividadeComTotais.total;
-      totalEnsinoInfantil += atividadeComTotais.ei ?? 0;
-      totalEnsinoFundamental += atividadeComTotais.ef ?? 0;
-      totalEnsinoMedio += atividadeComTotais.em ?? 0;
-      totalEducacaoEspecial += atividadeComTotais.ee ?? 0;
-      totalEja += atividadeComTotais.eja ?? 0;
-
-      // Adicionar placas únicas das atividades
-      if (atividade.placas.isNotEmpty) {
-        final placas = atividade.placas.split(RegExp(r'[,;\n]'));
-        for (final placa in placas) {
-          final placaLimpa = placa.trim();
-          if (placaLimpa.isNotEmpty) {
-            placasUnicas.add(placaLimpa);
-          }
-        }
+      for (final a in atividades) {
+        _adicionarPlacas(placasContrato, a.placas);
+        kmExtraContrato += a.kmXNumeroOnibusXDias;
+        eiContrato += a.ei ?? 0;
+        efContrato += a.ef ?? 0;
+        emContrato += a.em ?? 0;
+        eeContrato += a.ee ?? 0;
+        ejaContrato += a.eja ?? 0;
       }
 
-      // Calcular quilometragem (usando KM x ÔNIBUS x DIAS)
-      quilometragemTotal += atividade.kmXNumeroOnibusXDias;
+      for (final r in reposicoes) {
+        kmExtraContrato += r.kmXNumeroOnibusXDias;
+      }
+
+      final totalKmContrato = kmRegularContrato + kmExtraContrato;
+      final valorNotaContrato = totalKmContrato * contrato.valorPorKm;
+
+      // Adicionar ao total geral
+      placasUnicas.addAll(placasContrato);
+      kmRegularTotal += kmRegularContrato;
+      kmExtraTotal += kmExtraContrato;
+      totalEi += eiContrato;
+      totalEf += efContrato;
+      totalEm += emContrato;
+      totalEe += eeContrato;
+      totalEja += ejaContrato;
+      valorTotalNota += valorNotaContrato;
+      totalItinerarios += itinerariosMes.length;
+      totalAtividades += atividades.length;
+      totalReposicoes += reposicoes.length;
     }
 
-    // Processar reposições de aula
-    for (final reposicao in reposicoes) {
-      // Reposições não têm contagem de alunos, apenas quilometragem
-      quilometragemTotal += reposicao.kmXNumeroOnibusXDias;
-    }
+    final totalAlunos = totalEi + totalEf + totalEm + totalEe + totalEja;
+    final totalKm = kmRegularTotal + kmExtraTotal;
 
     return {
       'totalAlunos': totalAlunos,
-      'totalEnsinoInfantil': totalEnsinoInfantil,
-      'totalEnsinoFundamental': totalEnsinoFundamental,
-      'totalEnsinoMedio': totalEnsinoMedio,
-      'totalEducacaoEspecial': totalEducacaoEspecial,
+      'totalEnsinoInfantil': totalEi,
+      'totalEnsinoFundamental': totalEf,
+      'totalEnsinoMedio': totalEm,
+      'totalEducacaoEspecial': totalEe,
       'totalEja': totalEja,
       'totalOnibus': placasUnicas.length,
-      'totalItinerarios': itinerarios.length,
-      'totalAtividadesExtracurriculares': atividades.length,
-      'totalReposicoesAula': reposicoes.length,
-      'quilometragemTotal': quilometragemTotal,
+      'totalItinerarios': totalItinerarios,
+      'totalAtividadesExtracurriculares': totalAtividades,
+      'totalReposicoesAula': totalReposicoes,
+      'quilometragemTotal': totalKm,
+      'valorTotalNota': valorTotalNota,
       'placasUnicas': placasUnicas.toList(),
     };
+  }
+
+  /// Adiciona placas únicas ao conjunto (mesma lógica do totalizador)
+  void _adicionarPlacas(Set<String> destino, String placas) {
+    placas
+        .split(RegExp(r'[,;\n]'))
+        .map((p) => p.trim().toUpperCase())
+        .where((p) => p.isNotEmpty)
+        .forEach(destino.add);
   }
 
   /// Gera relatório PDF das estatísticas globais
@@ -269,47 +260,322 @@ class EstatisticasGlobaisService {
     required int mes,
     required int ano,
   }) async {
-    // TODO: Implementar geração de PDF
-    // Por enquanto, apenas printar as estatísticas
-    print('=== ESTATÍSTICAS GLOBAIS - $mes/$ano ===');
-
     final estatisticasPorRegional =
         dados['estatisticasPorRegional'] as Map<String, Map<String, dynamic>>;
     final totalGeral = dados['totalGeral'] as Map<String, dynamic>;
 
-    // Printar estatísticas por regional
-    for (final entry in estatisticasPorRegional.entries) {
-      final regional = entry.value['regional'] as Regional;
-      final estatisticas = entry.value['estatisticas'] as Map<String, dynamic>;
-
-      print('\n--- ${regional.descricao} ---');
-      print('Alunos: ${estatisticas['totalAlunos']}');
-      print('EI: ${estatisticas['totalEnsinoInfantil']}');
-      print('EF: ${estatisticas['totalEnsinoFundamental']}');
-      print('EM: ${estatisticas['totalEnsinoMedio']}');
-      print('EE: ${estatisticas['totalEducacaoEspecial']}');
-      print('EJA: ${estatisticas['totalEja']}');
-      print('Ônibus: ${estatisticas['totalOnibus']}');
-      print('Itinerários: ${estatisticas['totalItinerarios']}');
-      print('Atividades: ${estatisticas['totalAtividadesExtracurriculares']}');
-      print('Reposições: ${estatisticas['totalReposicoesAula']}');
-      print('KM: ${estatisticas['quilometragemTotal']}');
-    }
-
-    // Printar total geral
-    print('\n=== TOTAL GERAL ===');
-    print('Total de Alunos: ${totalGeral['totalAlunos']}');
-    print('Ensino Infantil: ${totalGeral['totalEnsinoInfantil']}');
-    print('Ensino Fundamental: ${totalGeral['totalEnsinoFundamental']}');
-    print('Ensino Médio: ${totalGeral['totalEnsinoMedio']}');
-    print('Educação Especial: ${totalGeral['totalEducacaoEspecial']}');
-    print('EJA: ${totalGeral['totalEja']}');
-    print('Total de Ônibus: ${totalGeral['totalOnibus']}');
-    print('Total de Itinerários: ${totalGeral['totalItinerarios']}');
-    print(
-      'Total de Atividades Extracurriculares: ${totalGeral['totalAtividadesExtracurriculares']}',
+    // Configurar tema do PDF
+    final theme = pw.ThemeData.withFont(
+      base: await PdfGoogleFonts.robotoRegular(),
+      bold: await PdfGoogleFonts.robotoBold(),
     );
-    print('Total de Reposições de Aula: ${totalGeral['totalReposicoesAula']}');
-    print('Quilometragem Total: ${totalGeral['quilometragemTotal']} km');
+
+    final doc = pw.Document(theme: theme);
+    final mesLabel = _nomeMes(mes).toUpperCase();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        build: (context) => [
+          _buildTituloGlobal(mesLabel, ano),
+          pw.SizedBox(height: 8),
+          _buildResumoGeral(totalGeral, mesLabel, ano.toString()),
+          pw.SizedBox(height: 8),
+          _buildEstatisticasPorRegional(estatisticasPorRegional),
+        ],
+      ),
+    );
+
+    // Salvar e abrir o PDF
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => doc.save(),
+      name: 'Relatorio_Global_${mesLabel}_$ano.pdf',
+    );
+  }
+
+  /// Constrói o título do relatório global
+  pw.Widget _buildTituloGlobal(String mesLabel, int ano) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.blue50,
+        border: pw.Border.all(color: PdfColors.blue200),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(
+            'SECRETARIA DE EDUCAÇÃO',
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.blue800,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'RELATÓRIO GLOBAL DE TRANSPORTE ESCOLAR',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.blue700,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            '$mesLabel $ano',
+            style: pw.TextStyle(fontSize: 12, color: PdfColors.blue600),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Constrói o resumo geral
+  pw.Widget _buildResumoGeral(
+    Map<String, dynamic> totalGeral,
+    String mesLabel,
+    String ano,
+  ) {
+    String money(double v) => CurrencyFormatter.format(v);
+
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.green50,
+        border: pw.Border.all(color: PdfColors.green200),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'RESUMO GERAL - $mesLabel $ano',
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.green800,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              _buildInfoBox(
+                'TOTAL DE ALUNOS',
+                totalGeral['totalAlunos'].toString(),
+              ),
+              _buildInfoBox(
+                'TOTAL DE ÔNIBUS',
+                totalGeral['totalOnibus'].toString(),
+              ),
+              _buildInfoBox(
+                'QUILOMETRAGEM TOTAL',
+                '${totalGeral['quilometragemTotal'].toStringAsFixed(1)} km',
+              ),
+              _buildInfoBox(
+                'VALOR TOTAL',
+                money(totalGeral['valorTotalNota'] ?? 0.0),
+                color: PdfColors.green700,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              _buildInfoBox(
+                'ENSINO INFANTIL',
+                totalGeral['totalEnsinoInfantil'].toString(),
+              ),
+              _buildInfoBox(
+                'ENSINO FUNDAMENTAL',
+                totalGeral['totalEnsinoFundamental'].toString(),
+              ),
+              _buildInfoBox(
+                'ENSINO MÉDIO',
+                totalGeral['totalEnsinoMedio'].toString(),
+              ),
+              _buildInfoBox(
+                'EDUCAÇÃO ESPECIAL',
+                totalGeral['totalEducacaoEspecial'].toString(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Constrói as estatísticas por regional
+  pw.Widget _buildEstatisticasPorRegional(
+    Map<String, Map<String, dynamic>> estatisticasPorRegional,
+  ) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'ESTATÍSTICAS POR REGIONAL',
+          style: pw.TextStyle(
+            fontSize: 12,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.grey800,
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2),
+            1: const pw.FlexColumnWidth(1),
+            2: const pw.FlexColumnWidth(1),
+            3: const pw.FlexColumnWidth(1),
+            4: const pw.FlexColumnWidth(1),
+            5: const pw.FlexColumnWidth(1),
+            6: const pw.FlexColumnWidth(1),
+            7: const pw.FlexColumnWidth(1),
+            8: const pw.FlexColumnWidth(1.5),
+          },
+          children: [
+            // Cabeçalho
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+              children: [
+                _buildHeaderCell('REGIONAL'),
+                _buildHeaderCell('ALUNOS'),
+                _buildHeaderCell('EI'),
+                _buildHeaderCell('EF'),
+                _buildHeaderCell('EM'),
+                _buildHeaderCell('EE'),
+                _buildHeaderCell('ÔNIBUS'),
+                _buildHeaderCell('KM'),
+                _buildHeaderCell('VALOR'),
+              ],
+            ),
+            // Dados das regionais
+            ...estatisticasPorRegional.values.map((entry) {
+              final regional = entry['regional'] as Regional;
+              final estatisticas =
+                  entry['estatisticas'] as Map<String, dynamic>;
+
+              return pw.TableRow(
+                children: [
+                  _buildDataCell(regional.descricao, isBold: true),
+                  _buildDataCell(estatisticas['totalAlunos'].toString()),
+                  _buildDataCell(
+                    estatisticas['totalEnsinoInfantil'].toString(),
+                  ),
+                  _buildDataCell(
+                    estatisticas['totalEnsinoFundamental'].toString(),
+                  ),
+                  _buildDataCell(estatisticas['totalEnsinoMedio'].toString()),
+                  _buildDataCell(
+                    estatisticas['totalEducacaoEspecial'].toString(),
+                  ),
+                  _buildDataCell(estatisticas['totalOnibus'].toString()),
+                  _buildDataCell(
+                    '${estatisticas['quilometragemTotal'].toStringAsFixed(1)} km',
+                  ),
+                  _buildDataCell(
+                    CurrencyFormatter.format(
+                      estatisticas['valorTotalNota'] ?? 0.0,
+                    ),
+                    isBold: true,
+                  ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Constrói uma caixa de informação
+  pw.Widget _buildInfoBox(String label, String value, {PdfColor? color}) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.white,
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+              color: color ?? PdfColors.grey800,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            label,
+            style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Constrói uma célula de cabeçalho
+  pw.Widget _buildHeaderCell(String text) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 9,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.grey800,
+        ),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+  }
+
+  /// Constrói uma célula de dados
+  pw.Widget _buildDataCell(String text, {bool isBold = false}) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 8,
+          fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          color: PdfColors.grey800,
+        ),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+  }
+
+  /// Retorna o nome do mês
+  String _nomeMes(int mes) {
+    const meses = [
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro',
+    ];
+    return meses[mes - 1];
   }
 }

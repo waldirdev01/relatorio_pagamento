@@ -9,6 +9,7 @@ import '../models/turno.dart';
 import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
 import '../services/itinerario_service.dart';
+import '../utils/currency_formatter.dart';
 
 class CadastroItinerarioScreen extends StatefulWidget {
   final Regional regional;
@@ -92,6 +93,12 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
       );
       setState(() {
         _contratosDisponiveis = contratos;
+        // Após carregar os contratos, selecionar o contrato se estivermos editando
+        if (_isEditing && widget.itinerario?.contratoId != null) {
+          _contratoSelecionado = _contratosDisponiveis
+              .where((c) => c.id == widget.itinerario!.contratoId)
+              .firstOrNull;
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -143,12 +150,8 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
     _motoristasController.text = itinerario.motoristas;
     _monitorasController.text = itinerario.monitoras;
 
-    // Buscar e selecionar o contrato
-    if (itinerario.contratoId != null) {
-      _contratoSelecionado = _contratosDisponiveis
-          .where((c) => c.id == itinerario.contratoId)
-          .firstOrNull;
-    }
+    // A seleção do contrato agora é feita no método _loadContratos()
+    // após os contratos serem carregados
   }
 
   @override
@@ -700,7 +703,7 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
                 ),
               ),
               Text(
-                'R\$ ${contrato.valorPorKm.toStringAsFixed(2)}/km',
+                CurrencyFormatter.formatWithUnit(contrato.valorPorKm, 'km'),
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],

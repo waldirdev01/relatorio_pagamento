@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/totalizador_service.dart';
+import '../utils/currency_formatter.dart';
 
 class TotalizadorScreen extends StatefulWidget {
   final Regional regional;
@@ -74,7 +75,7 @@ class _TotalizadorScreenState extends State<TotalizadorScreen> {
                     Text('Regional: ${widget.regional.descricao}'),
                     Text('Contrato: ${widget.contrato.nome}'),
                     Text(
-                      'Valor por Km: R\$ ${widget.contrato.valorPorKm.toStringAsFixed(2)}',
+                      'Valor por Km: ${CurrencyFormatter.formatWithUnit(widget.contrato.valorPorKm, 'km')}',
                     ),
                   ],
                 ),

@@ -9,6 +9,7 @@ import 'itinerarios_screen.dart';
 import 'login_screen.dart';
 import 'selecionar_contrato_screen.dart';
 import 'selecionar_contrato_totalizador_screen.dart';
+import 'totalizador_regional_screen.dart';
 
 class RegionalHomeScreen extends StatelessWidget {
   final Regional regional;
@@ -176,9 +177,19 @@ class RegionalHomeScreen extends StatelessWidget {
                   subtitle: 'Gerar quadro totalizador financeiro',
                   onTap: () => _navigateToTotalizador(context),
                 ),
-                // Card vazio para manter layout
-                Container(),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Card Totalizador Regional (largura completa)
+            _buildNavigationCard(
+              context,
+              icon: Icons.account_balance,
+              title: 'Totalizador Regional',
+              subtitle:
+                  'Gerar quadro consolidado de todos os contratos da regional',
+              onTap: () => _navigateToTotalizadorRegional(context),
             ),
 
             const SizedBox(height: 32),
@@ -284,6 +295,14 @@ class RegionalHomeScreen extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) =>
             SelecionarContratoTotalizadorScreen(regional: regional),
+      ),
+    );
+  }
+
+  void _navigateToTotalizadorRegional(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TotalizadorRegionalScreen(regional: regional),
       ),
     );
   }

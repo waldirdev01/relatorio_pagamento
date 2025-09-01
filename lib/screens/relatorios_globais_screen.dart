@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/estatisticas_globais_service.dart';
+import '../utils/currency_formatter.dart';
 
 class RelatoriosGlobaisScreen extends StatefulWidget {
   const RelatoriosGlobaisScreen({super.key});
@@ -354,28 +355,67 @@ class _RelatoriosGlobaisScreenState extends State<RelatoriosGlobaisScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Quilometragem da regional
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.straighten,
-                          size: 20,
-                          color: Colors.deepOrange,
+                  // Quilometragem e valor da regional
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.straighten,
+                                size: 20,
+                                color: Colors.deepOrange,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Quilometragem: ${estatisticas['quilometragemTotal'].toStringAsFixed(2)} km',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Quilometragem: ${estatisticas['quilometragemTotal'].toStringAsFixed(2)} km',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green[200]!),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.attach_money,
+                                size: 20,
+                                color: Colors.green[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Valor Total: ${CurrencyFormatter.format(estatisticas['valorTotalNota'] ?? 0.0)}',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.green[700],
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -474,49 +514,109 @@ class _RelatoriosGlobaisScreenState extends State<RelatoriosGlobaisScreen> {
 
                 const SizedBox(height: 16),
 
-                // Quilometragem total
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.straighten,
-                        size: 32,
-                        color: Colors.deepOrange,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                // Quilometragem e valor total
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
                           children: [
-                            Text(
-                              'Quilometragem Total',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            Icon(
+                              Icons.straighten,
+                              size: 32,
+                              color: Colors.deepOrange,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${totalGeral['quilometragemTotal'].toStringAsFixed(2)} km',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.deepOrange,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Quilometragem Total',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${totalGeral['quilometragemTotal'].toStringAsFixed(2)} km',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.deepOrange,
+                                        ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.attach_money,
+                              size: 32,
+                              color: Colors.green[700],
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Valor Total',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    CurrencyFormatter.format(
+                                      totalGeral['valorTotalNota'] ?? 0.0,
+                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[700],
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

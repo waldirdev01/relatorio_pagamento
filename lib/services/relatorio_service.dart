@@ -10,6 +10,7 @@ import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/reposicao_aula.dart';
 import '../models/turno.dart';
+import '../utils/currency_formatter.dart';
 import 'escola_service.dart';
 
 class RelatorioService {
@@ -160,7 +161,7 @@ class RelatorioService {
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            'VALOR POR KM: R\$ ${contrato.valorPorKm.toStringAsFixed(2)}',
+            'VALOR POR KM: ${CurrencyFormatter.formatWithUnit(contrato.valorPorKm, 'km')}',
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
             textAlign: pw.TextAlign.center,
           ),

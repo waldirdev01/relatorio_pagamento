@@ -13,6 +13,11 @@ import 'screens/regional_home_screen.dart';
 import 'services/auth_service.dart';
 import 'services/regional_service.dart';
 
+const String loginRoute = '/login';
+const String cadastroRoute = '/cadastro';
+const String gerenciarUsuariosRoute = '/gerenciar-usuarios';
+const String regionaisRoute = '/regionais';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -22,7 +27,6 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -58,10 +62,10 @@ class MyApp extends StatelessWidget {
       ),
       home: const AuthWrapper(),
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/cadastro': (context) => const CadastroUsuarioScreen(),
-        '/gerenciar-usuarios': (context) => const GerenciarUsuariosScreen(),
-        '/regionais': (context) => const RegionaisScreen(),
+        loginRoute: (context) => const LoginScreen(),
+        cadastroRoute: (context) => const CadastroUsuarioScreen(),
+        gerenciarUsuariosRoute: (context) => const GerenciarUsuariosScreen(),
+        regionaisRoute: (context) => const RegionaisScreen(),
       },
     );
   }
@@ -90,6 +94,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Text('Erro de autenticação: ${snapshot.error}'),
+            ),
+          );
+        }
+
         // Se não há usuário logado, mostrar tela de login
         if (snapshot.data == null) {
           return const LoginScreen();
@@ -102,6 +114,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
             if (userSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (userSnapshot.hasError) {
+              return Scaffold(
+                body: Center(
+                  child: Text('Erro ao buscar usuário: ${userSnapshot.error}'),
+                ),
               );
             }
 
@@ -141,19 +161,46 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 );
               }
 
+              if (snapshot.hasError) {
+                return Scaffold(
+                  body: Center(
+                    child: Text('Erro ao buscar regional: ${snapshot.error}'),
+                  ),
+                );
+              }
+
               final regional = snapshot.data;
               if (regional != null) {
                 return RegionalHomeScreen(regional: regional);
-              } else {
-                // Fallback se não encontrar a regional
-                return MainHomeScreen();
               }
+
+              // Fallback se não encontrar a regional
+              return Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Regional não encontrada.'),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MainHomeScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text('Ir para a tela principal'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             },
           );
-        } else {
-          // Fallback se não tiver regionalId
-          return MainHomeScreen();
         }
+        // Fallback se não tiver regionalId
+        return MainHomeScreen();
     }
   }
 }

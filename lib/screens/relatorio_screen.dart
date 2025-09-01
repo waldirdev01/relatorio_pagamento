@@ -8,6 +8,7 @@ import '../services/atividade_extracurricular_service.dart';
 import '../services/itinerario_service.dart';
 import '../services/relatorio_service.dart';
 import '../services/reposicao_aula_service.dart';
+import '../utils/currency_formatter.dart';
 
 class RelatorioScreen extends StatefulWidget {
   final Regional regional;
@@ -87,7 +88,7 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
                       ),
                     ),
                     Text(
-                      'Valor por Km: R\$ ${widget.contrato.valorPorKm.toStringAsFixed(2)}',
+                      'Valor por Km: ${CurrencyFormatter.formatWithUnit(widget.contrato.valorPorKm, 'km')}',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],

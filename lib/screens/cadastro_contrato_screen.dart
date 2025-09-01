@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/contrato_service.dart';
+import '../utils/currency_formatter.dart';
 
 class CadastroContratoScreen extends StatefulWidget {
   final Regional regional;
@@ -34,7 +35,9 @@ class _CadastroContratoScreenState extends State<CadastroContratoScreen> {
     super.initState();
     _nomeController = TextEditingController(text: widget.contrato?.nome ?? '');
     _valorPorKmController = TextEditingController(
-      text: widget.contrato?.valorPorKm.toStringAsFixed(2) ?? '',
+      text: widget.contrato != null
+          ? CurrencyFormatter.formatWithoutSymbol(widget.contrato!.valorPorKm)
+          : '',
     );
   }
 
@@ -138,7 +141,7 @@ class _CadastroContratoScreenState extends State<CadastroContratoScreen> {
                       controller: _valorPorKmController,
                       decoration: const InputDecoration(
                         labelText: 'Valor por Quilômetro (R\$)',
-                        hintText: 'Ex: 5.50',
+                        hintText: 'Ex: 5,50',
                         prefixIcon: Icon(Icons.attach_money),
                         border: OutlineInputBorder(),
                         suffixText: 'R\$/km',
@@ -147,23 +150,20 @@ class _CadastroContratoScreenState extends State<CadastroContratoScreen> {
                         decimal: true,
                       ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
-                        TextInputFormatter.withFunction((oldValue, newValue) {
-                          // Substituir vírgula por ponto
-                          final newText = newValue.text.replaceAll(',', '.');
-                          return newValue.copyWith(text: newText);
-                        }),
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
                       ],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Campo obrigatório';
                         }
 
-                        final valorDouble = double.tryParse(value.trim());
-                        if (valorDouble == null) {
+                        if (!CurrencyFormatter.isValid(value.trim())) {
                           return 'Valor inválido';
                         }
 
+                        final valorDouble = CurrencyFormatter.parse(
+                          value.trim(),
+                        );
                         if (valorDouble <= 0) {
                           return 'Valor deve ser maior que zero';
                         }
@@ -222,7 +222,9 @@ class _CadastroContratoScreenState extends State<CadastroContratoScreen> {
     });
 
     try {
-      final valorPorKm = double.parse(_valorPorKmController.text.trim());
+      final valorPorKm = CurrencyFormatter.parse(
+        _valorPorKmController.text.trim(),
+      );
 
       final contrato = _isEdicao
           ? widget.contrato!.copyWith(

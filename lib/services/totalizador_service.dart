@@ -8,9 +8,11 @@ import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/turno.dart';
 import '../services/atividade_extracurricular_service.dart';
+import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
 import '../services/itinerario_service.dart';
 import '../services/reposicao_aula_service.dart';
+import '../utils/currency_formatter.dart';
 
 class TotalizadorService {
   final ItinerarioService _itinerarioService = ItinerarioService();
@@ -18,6 +20,7 @@ class TotalizadorService {
       AtividadeExtracurricularService();
   final ReposicaoAulaService _reposicaoService = ReposicaoAulaService();
   final EscolaService _escolaService = EscolaService();
+  final ContratoService _contratoService = ContratoService();
 
   Future<void> gerarRelatorioTotalizadorPDF({
     required Regional regional,
@@ -282,7 +285,7 @@ class TotalizadorService {
       width: double.infinity,
       alignment: pw.Alignment.center,
       child: pw.Text(
-        'QUADRO DE ITINERÁRIO - $mesLabel - $ano - REGIÃO "${regional.descricao.toUpperCase()}" - ${contrato.nome.toUpperCase()}',
+        'QUADRO TOTALIZADOR - $mesLabel - $ano - REGIÃO "${regional.descricao.toUpperCase()}" - ${contrato.nome.toUpperCase()}',
         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
         textAlign: pw.TextAlign.center,
       ),
@@ -537,7 +540,7 @@ class TotalizadorService {
     required double valorEja,
     required Contrato contrato,
   }) {
-    String money(double v) => 'R\$ ${v.toStringAsFixed(2)}';
+    String money(double v) => CurrencyFormatter.format(v);
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
@@ -745,5 +748,363 @@ class TotalizadorService {
       'dezembro',
     ];
     return meses[mes - 1];
+  }
+
+  /// Gera o totalizador consolidado da regional (todos os contratos)
+  Future<void> gerarRelatorioTotalizadorRegionalPDF({
+    required Regional regional,
+    required DateTime dataInicio,
+    required DateTime dataFim,
+    String? processoOrigem,
+    String? observacoes,
+  }) async {
+    // Buscar todos os contratos da regional
+    final contratos = await _contratoService.buscarContratosPorRegional(
+      regional.id,
+    );
+
+    if (contratos.isEmpty) {
+      throw Exception('Nenhum contrato encontrado para esta regional');
+    }
+
+    // Agregar dados de todos os contratos
+    final placasUnicas = <String>{};
+    double kmRegularTotal = 0;
+    double kmExtraTotal = 0;
+    int totalEi = 0, totalEf = 0, totalEm = 0, totalEe = 0, totalEja = 0;
+    double valorTotalNota = 0;
+
+    // Dados por contrato para o relatório
+    final dadosPorContrato = <Map<String, dynamic>>[];
+
+    for (final contrato in contratos) {
+      // Buscar dados do contrato
+      final itinerarios = await _itinerarioService
+          .getItinerariosPorContrato(contrato.id)
+          .catchError((e) => <Itinerario>[]);
+
+      final atividades = await _atividadeService
+          .getAtividadesPorContratoPeriodo(
+            contratoId: contrato.id,
+            mes: dataInicio.month,
+            ano: dataInicio.year,
+          );
+
+      final reposicoes = await _reposicaoService
+          .getReposicoesPorContratoPeriodo(
+            contratoId: contrato.id,
+            mes: dataInicio.month,
+            ano: dataInicio.year,
+          );
+
+      // Filtrar itinerários por mês/ano
+      final itinerariosMes = itinerarios.where((i) {
+        return i.dataCriacao.month == dataInicio.month &&
+            i.dataCriacao.year == dataInicio.year;
+      }).toList();
+
+      // Agregações do contrato
+      final placasContrato = <String>{};
+      double kmRegularContrato = 0;
+      double kmExtraContrato = 0;
+      int eiContrato = 0,
+          efContrato = 0,
+          emContrato = 0,
+          eeContrato = 0,
+          ejaContrato = 0;
+
+      for (final i in itinerariosMes) {
+        _adicionarPlacas(placasContrato, i.placas);
+        kmRegularContrato += i.kmXNumeroOnibusXDias;
+        eiContrato += i.ei ?? 0;
+        efContrato += i.ef ?? 0;
+        emContrato += i.em ?? 0;
+        eeContrato += i.ee ?? 0;
+        ejaContrato += i.eja ?? 0;
+      }
+
+      for (final a in atividades) {
+        _adicionarPlacas(placasContrato, a.placas);
+        kmExtraContrato += a.kmXNumeroOnibusXDias;
+        eiContrato += a.ei ?? 0;
+        efContrato += a.ef ?? 0;
+        emContrato += a.em ?? 0;
+        eeContrato += a.ee ?? 0;
+        ejaContrato += a.eja ?? 0;
+      }
+
+      for (final r in reposicoes) {
+        kmExtraContrato += r.kmXNumeroOnibusXDias;
+      }
+
+      final totalKmContrato = kmRegularContrato + kmExtraContrato;
+      final valorNotaContrato = totalKmContrato * contrato.valorPorKm;
+      final totalAlunosContrato =
+          eiContrato + efContrato + emContrato + eeContrato + ejaContrato;
+
+      // Adicionar ao total geral
+      placasUnicas.addAll(placasContrato);
+      kmRegularTotal += kmRegularContrato;
+      kmExtraTotal += kmExtraContrato;
+      totalEi += eiContrato;
+      totalEf += efContrato;
+      totalEm += emContrato;
+      totalEe += eeContrato;
+      totalEja += ejaContrato;
+      valorTotalNota += valorNotaContrato;
+
+      // Dados do contrato para o relatório
+      dadosPorContrato.add({
+        'contrato': contrato,
+        'kmRegular': kmRegularContrato,
+        'kmExtra': kmExtraContrato,
+        'totalKm': totalKmContrato,
+        'valorNota': valorNotaContrato,
+        'ei': eiContrato,
+        'ef': efContrato,
+        'em': emContrato,
+        'ee': eeContrato,
+        'eja': ejaContrato,
+        'totalAlunos': totalAlunosContrato,
+        'placas': placasContrato.length,
+      });
+    }
+
+    final totalAlunos = totalEi + totalEf + totalEm + totalEe + totalEja;
+    final totalKm = kmRegularTotal + kmExtraTotal;
+
+    // Calcular percentuais por modalidade
+    double pct(int v) => totalAlunos > 0 ? v / totalAlunos : 0;
+    final valorEi = valorTotalNota * pct(totalEi);
+    final valorEf = valorTotalNota * pct(totalEf);
+    final valorEm = valorTotalNota * pct(totalEm);
+    final valorEe = valorTotalNota * pct(totalEe);
+    final valorEja = valorTotalNota * pct(totalEja);
+
+    // Gerar PDF
+    final baseFont = await PdfGoogleFonts.openSansRegular();
+    final boldFont = await PdfGoogleFonts.openSansBold();
+    final italicFont = await PdfGoogleFonts.openSansItalic();
+    final theme = pw.ThemeData.withFont(
+      base: baseFont,
+      bold: boldFont,
+      italic: italicFont,
+    );
+    final doc = pw.Document(theme: theme);
+    final mesLabel = _nomeMes(dataInicio.month).toUpperCase();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        build: (context) => [
+          _buildTituloRegional(regional, mesLabel, dataInicio.year),
+          pw.SizedBox(height: 8),
+          _buildTopInfosRegional(
+            mesLabel: mesLabel,
+            ano: dataInicio.year.toString(),
+            processoOrigem: processoOrigem ?? '',
+            quantidadeOnibus: placasUnicas.length,
+            quantidadeContratos: contratos.length,
+          ),
+          pw.SizedBox(height: 6),
+          // Resumo geral da regional
+          _buildResumoGeralRegional(
+            totalAlunos: totalAlunos,
+            totalKm: totalKm,
+            valorTotalNota: valorTotalNota,
+            valorEi: valorEi,
+            valorEf: valorEf,
+            valorEm: valorEm,
+            valorEe: valorEe,
+            valorEja: valorEja,
+          ),
+          pw.SizedBox(height: 6),
+          // Detalhamento por contrato
+          _buildDetalhamentoPorContrato(dadosPorContrato),
+          pw.SizedBox(height: 8),
+          _buildObservacoes(observacoes ?? ''),
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => doc.save(),
+      name:
+          'Totalizador_Regional_${regional.descricao}_${mesLabel}_${dataInicio.year}.pdf',
+    );
+  }
+
+  pw.Widget _buildTituloRegional(Regional regional, String mesLabel, int ano) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.blue50,
+        border: pw.Border.all(color: PdfColors.blue200),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(
+            'TOTALIZADOR CONSOLIDADO DA REGIONAL',
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.blue800,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            '${regional.descricao.toUpperCase()} - $mesLabel $ano',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.blue700,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildTopInfosRegional({
+    required String mesLabel,
+    required String ano,
+    required String processoOrigem,
+    required int quantidadeOnibus,
+    required int quantidadeContratos,
+  }) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+      children: [
+        pw.TableRow(
+          children: [
+            _smallBox('MÊS/ANO', '$mesLabel $ano'),
+            _smallBox('PROCESSO ORIGEM', processoOrigem),
+            _smallBox('TOTAL DE ÔNIBUS', quantidadeOnibus.toString()),
+            _smallBox('TOTAL DE CONTRATOS', quantidadeContratos.toString()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildResumoGeralRegional({
+    required int totalAlunos,
+    required double totalKm,
+    required double valorTotalNota,
+    required double valorEi,
+    required double valorEf,
+    required double valorEm,
+    required double valorEe,
+    required double valorEja,
+  }) {
+    String money(double v) => CurrencyFormatter.format(v);
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(1.5),
+        1: pw.FlexColumnWidth(1.5),
+        2: pw.FlexColumnWidth(1.5),
+        3: pw.FlexColumnWidth(1.5),
+        4: pw.FlexColumnWidth(1.5),
+        5: pw.FlexColumnWidth(1.5),
+        6: pw.FlexColumnWidth(1.5),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: [
+            _smallBox('TOTAL DE ALUNOS', totalAlunos.toString()),
+            _smallBox('TOTAL KM', totalKm.toStringAsFixed(1)),
+            _smallBox(
+              'VALOR TOTAL NOTA',
+              money(valorTotalNota),
+              color: PdfColors.pink200,
+            ),
+            _smallBox('ENSINO INFANTIL', money(valorEi)),
+            _smallBox('ENSINO FUNDAMENTAL', money(valorEf)),
+            _smallBox('ENSINO MÉDIO', money(valorEm)),
+            _smallBox('ENSINO ESPECIAL', money(valorEe)),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            _smallBox('EJA', money(valorEja)),
+            _smallBox('', ''),
+            _smallBox('', ''),
+            _smallBox('', ''),
+            _smallBox('', ''),
+            _smallBox('', ''),
+            _smallBox('', ''),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildDetalhamentoPorContrato(
+    List<Map<String, dynamic>> dadosPorContrato,
+  ) {
+    String money(double v) => CurrencyFormatter.format(v);
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(2),
+        1: pw.FlexColumnWidth(1),
+        2: pw.FlexColumnWidth(1),
+        3: pw.FlexColumnWidth(1),
+        4: pw.FlexColumnWidth(1),
+        5: pw.FlexColumnWidth(1),
+        6: pw.FlexColumnWidth(1),
+        7: pw.FlexColumnWidth(1),
+        8: pw.FlexColumnWidth(1),
+        9: pw.FlexColumnWidth(1),
+        10: pw.FlexColumnWidth(1),
+      },
+      children: [
+        // Cabeçalho
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: [
+            _smallBox('CONTRATO', ''),
+            _smallBox('KM REGULAR', ''),
+            _smallBox('KM EXTRA', ''),
+            _smallBox('TOTAL KM', ''),
+            _smallBox('VALOR NOTA', ''),
+            _smallBox('EI', ''),
+            _smallBox('EF', ''),
+            _smallBox('EM', ''),
+            _smallBox('EE', ''),
+            _smallBox('EJA', ''),
+            _smallBox('TOTAL ALUNOS', ''),
+          ],
+        ),
+        // Dados de cada contrato
+        ...dadosPorContrato.map((dados) {
+          final contrato = dados['contrato'] as Contrato;
+          return pw.TableRow(
+            children: [
+              _smallBox(contrato.nome, ''),
+              _smallBox(dados['kmRegular'].toStringAsFixed(1), ''),
+              _smallBox(dados['kmExtra'].toStringAsFixed(1), ''),
+              _smallBox(dados['totalKm'].toStringAsFixed(1), ''),
+              _smallBox(money(dados['valorNota']), ''),
+              _smallBox(dados['ei'].toString(), ''),
+              _smallBox(dados['ef'].toString(), ''),
+              _smallBox(dados['em'].toString(), ''),
+              _smallBox(dados['ee'].toString(), ''),
+              _smallBox(dados['eja'].toString(), ''),
+              _smallBox(dados['totalAlunos'].toString(), ''),
+            ],
+          );
+        }),
+      ],
+    );
   }
 }

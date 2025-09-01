@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/contrato_service.dart';
+import '../utils/currency_formatter.dart';
 import 'relatorio_screen.dart';
 
 class SelecionarContratoScreen extends StatefulWidget {
@@ -169,7 +170,7 @@ class _SelecionarContratoScreenState extends State<SelecionarContratoScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Valor por Km: R\$ ${contrato.valorPorKm.toStringAsFixed(2)}',
+                          'Valor por Km: ${CurrencyFormatter.formatWithUnit(contrato.valorPorKm, 'km')}',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w500,

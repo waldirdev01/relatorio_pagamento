@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/contrato_service.dart';
+import '../utils/currency_formatter.dart';
 import 'cadastro_contrato_screen.dart';
 
 class ContratosScreen extends StatefulWidget {
@@ -169,7 +170,10 @@ class _ContratosScreenState extends State<ContratosScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'R\$ ${contrato.valorPorKm.toStringAsFixed(2)}/km',
+                          CurrencyFormatter.formatWithUnit(
+                            contrato.valorPorKm,
+                            'km',
+                          ),
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.primary,
