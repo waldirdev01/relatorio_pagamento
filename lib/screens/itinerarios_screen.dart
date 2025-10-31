@@ -5,9 +5,11 @@ import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/reposicao_aula.dart';
 import '../models/turno.dart';
+import '../services/auth_service.dart';
 import '../services/escola_service.dart';
 import '../services/itinerario_service.dart';
 import '../services/reposicao_aula_service.dart';
+import '../services/usuario_service.dart';
 import 'cadastro_itinerario_screen.dart';
 import 'cadastro_reposicao_screen.dart';
 import 'selecionar_contrato_screen.dart';
@@ -30,6 +32,8 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
   final ItinerarioService _itinerarioService = ItinerarioService();
   final ReposicaoAulaService _reposicaoService = ReposicaoAulaService();
   final EscolaService _escolaService = EscolaService();
+  final AuthService _authService = AuthService();
+  final UsuarioService _usuarioService = UsuarioService();
 
   // Modo de seleção múltipla
   bool _isSelectionMode = false;
@@ -38,6 +42,9 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
   // Filtro de mês/ano para reposições
   int _mesSelecionado = DateTime.now().month;
   int _anoSelecionado = DateTime.now().year;
+
+  // Cache para usuários para evitar consultas repetidas
+  final Map<String, String> _usuarioCache = {};
 
   final List<String> _meses = [
     'Janeiro',
@@ -490,6 +497,8 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildInfoRow('Trajeto', itinerario.trajeto),
+                if (itinerario.ei != null)
+                  _buildInfoRow('Alunos EI', itinerario.ei.toString()),
                 if (itinerario.ef != null)
                   _buildInfoRow('Alunos EF', itinerario.ef.toString()),
                 if (itinerario.em != null)
@@ -516,6 +525,71 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
                 ),
                 _buildInfoRow('Motoristas', itinerario.motoristas),
                 _buildInfoRow('Monitoras', itinerario.monitoras),
+
+                // Informações do usuário (criação e edição)
+                const SizedBox(height: 8),
+                FutureBuilder<String>(
+                  future: _obterInfoCriacaoItinerario(itinerario),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_add,
+                              size: 14,
+                              color: Colors.blue[600],
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                snapshot.data!,
+                                style: TextStyle(
+                                  color: Colors.blue[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<String>(
+                  future: _obterInfoEdicaoItinerario(itinerario),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: 14,
+                              color: Colors.orange[600],
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                snapshot.data!,
+                                style: TextStyle(
+                                  color: Colors.orange[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 const SizedBox(height: 16),
 
                 // Seção de escolas
@@ -1006,6 +1080,10 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
 
   Future<void> _atualizarDiasTrabalhadosEmLote(int novosDias) async {
     try {
+      // Obter usuário atual
+      final usuarioAtual = await _authService.getUsuarioAtual();
+      final usuarioId = usuarioAtual?.id;
+
       for (String itinerarioId in _selectedItinerarios) {
         final itinerario = await _itinerarioService.getItinerarioById(
           itinerarioId,
@@ -1018,7 +1096,10 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
               )
               .calcularTotais();
 
-          await _itinerarioService.atualizarItinerario(itinerarioAtualizado);
+          await _itinerarioService.atualizarItinerario(
+            itinerarioAtualizado,
+            usuarioId,
+          );
         }
       }
 
@@ -1083,6 +1164,10 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
     Itinerario itinerario,
     Map<String, dynamic> dados,
   ) async {
+    // Obter usuário atual
+    final usuarioAtual = await _authService.getUsuarioAtual();
+    final usuarioId = usuarioAtual?.id;
+
     final novoItinerario = itinerario
         .copyWith(
           id: '', // Novo ID será gerado
@@ -1096,7 +1181,7 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
         )
         .calcularTotais();
 
-    await _itinerarioService.adicionarItinerario(novoItinerario);
+    await _itinerarioService.adicionarItinerario(novoItinerario, usuarioId);
   }
 
   Future<void> _excluirReposicao(ReposicaoAula reposicao) async {
@@ -1127,6 +1212,118 @@ class _ItinerariosScreenState extends State<ItinerariosScreen> {
         );
       }
     }
+  }
+
+  /// Obtém informações do usuário que criou/editou o itinerário
+  Future<String> _obterInfoCriacaoItinerario(Itinerario itinerario) async {
+    try {
+      if (itinerario.usuarioCriacaoId == null) return '';
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[itinerario.usuarioCriacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          itinerario.usuarioCriacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[itinerario.usuarioCriacaoId!] = nomeUsuario;
+      }
+
+      return 'Criado por $nomeUsuario em ${_formatarData(itinerario.dataCriacao)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Obtém informações do usuário que editou o itinerário
+  Future<String> _obterInfoEdicaoItinerario(Itinerario itinerario) async {
+    try {
+      if (itinerario.usuarioAtualizacaoId == null ||
+          itinerario.dataAtualizacao == null) {
+        return '';
+      }
+
+      // Verificar cache primeiro
+      String nomeUsuario =
+          _usuarioCache[itinerario.usuarioAtualizacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          itinerario.usuarioAtualizacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[itinerario.usuarioAtualizacaoId!] = nomeUsuario;
+      }
+
+      return 'Editado por $nomeUsuario em ${_formatarData(itinerario.dataAtualizacao!)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Obtém informações do usuário que criou/editou a reposição
+  Future<String> _obterInfoCriacaoReposicao(ReposicaoAula reposicao) async {
+    try {
+      if (reposicao.usuarioCriacaoId == null) return '';
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[reposicao.usuarioCriacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          reposicao.usuarioCriacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[reposicao.usuarioCriacaoId!] = nomeUsuario;
+      }
+
+      return 'Criado por $nomeUsuario em ${_formatarData(reposicao.dataCriacao)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Obtém informações do usuário que editou a reposição
+  Future<String> _obterInfoEdicaoReposicao(ReposicaoAula reposicao) async {
+    try {
+      if (reposicao.usuarioAtualizacaoId == null ||
+          reposicao.dataAtualizacao == null) {
+        return '';
+      }
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[reposicao.usuarioAtualizacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          reposicao.usuarioAtualizacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[reposicao.usuarioAtualizacaoId!] = nomeUsuario;
+      }
+
+      return 'Editado por $nomeUsuario em ${_formatarData(reposicao.dataAtualizacao!)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Formatar data no padrão brasileiro
+  String _formatarData(DateTime data) {
+    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
   }
 }
 

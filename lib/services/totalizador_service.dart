@@ -7,11 +7,13 @@ import '../models/escola.dart';
 import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/turno.dart';
+import '../models/usuario.dart';
 import '../services/atividade_extracurricular_service.dart';
 import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
 import '../services/itinerario_service.dart';
 import '../services/reposicao_aula_service.dart';
+import '../services/usuario_service.dart';
 import '../utils/currency_formatter.dart';
 
 class TotalizadorService {
@@ -21,6 +23,7 @@ class TotalizadorService {
   final ReposicaoAulaService _reposicaoService = ReposicaoAulaService();
   final EscolaService _escolaService = EscolaService();
   final ContratoService _contratoService = ContratoService();
+  final UsuarioService _usuarioService = UsuarioService();
 
   Future<void> gerarRelatorioTotalizadorPDF({
     required Regional regional,
@@ -30,6 +33,11 @@ class TotalizadorService {
     String? processoOrigem,
     String? observacoes,
   }) async {
+    // Buscar chefe da UNIAE da regional
+    final chefeUniae = await _usuarioService.getChefeUniaePorRegional(
+      regional.id,
+    );
+
     // Buscar dados
     final itinerarios = await _itinerarioService
         .getItinerariosPorContrato(contrato.id)
@@ -261,7 +269,7 @@ class TotalizadorService {
             escolasRurais: escolasRur,
           ),
           pw.SizedBox(height: 10),
-          _buildRodape(regional: regional),
+          _buildRodape(regional: regional, chefeUniae: chefeUniae),
         ],
       ),
     );
@@ -380,7 +388,7 @@ class TotalizadorService {
             _smallBox('0', ''),
             _smallBox((alunosPorModalidade['EI'] ?? 0).toString(), ''),
             _smallBox(
-              '${((alunosPorModalidade['EI'] ?? 0) / totalAlunos * 100).toStringAsFixed(2)}%',
+              '${((alunosPorModalidade['EI'] ?? 0) / totalAlunos * 100).toStringAsFixed(2).replaceAll('.', ',')}%',
               '',
             ),
           ],
@@ -394,7 +402,7 @@ class TotalizadorService {
             _smallBox('0', ''),
             _smallBox((alunosPorModalidade['EF'] ?? 0).toString(), ''),
             _smallBox(
-              '${((alunosPorModalidade['EF'] ?? 0) / totalAlunos * 100).toStringAsFixed(2)}%',
+              '${((alunosPorModalidade['EF'] ?? 0) / totalAlunos * 100).toStringAsFixed(2).replaceAll('.', ',')}%',
               '',
             ),
           ],
@@ -408,7 +416,7 @@ class TotalizadorService {
             _smallBox('0', ''),
             _smallBox((alunosPorModalidade['EM'] ?? 0).toString(), ''),
             _smallBox(
-              '${((alunosPorModalidade['EM'] ?? 0) / totalAlunos * 100).toStringAsFixed(2)}%',
+              '${((alunosPorModalidade['EM'] ?? 0) / totalAlunos * 100).toStringAsFixed(2).replaceAll('.', ',')}%',
               '',
             ),
           ],
@@ -422,7 +430,7 @@ class TotalizadorService {
             _smallBox('0', ''),
             _smallBox((alunosPorModalidade['EE'] ?? 0).toString(), ''),
             _smallBox(
-              '${((alunosPorModalidade['EE'] ?? 0) / totalAlunos * 100).toStringAsFixed(2)}%',
+              '${((alunosPorModalidade['EE'] ?? 0) / totalAlunos * 100).toStringAsFixed(2).replaceAll('.', ',')}%',
               '',
             ),
           ],
@@ -436,7 +444,7 @@ class TotalizadorService {
             _smallBox('0', ''),
             _smallBox((alunosPorModalidade['EJA'] ?? 0).toString(), ''),
             _smallBox(
-              '${((alunosPorModalidade['EJA'] ?? 0) / totalAlunos * 100).toStringAsFixed(2)}%',
+              '${((alunosPorModalidade['EJA'] ?? 0) / totalAlunos * 100).toStringAsFixed(2).replaceAll('.', ',')}%',
               '',
             ),
           ],
@@ -599,7 +607,7 @@ class TotalizadorService {
     required double kmAtivDif,
     required double kmTotal,
   }) {
-    String km(double v) => v.toStringAsFixed(2);
+    String km(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
       children: [
@@ -671,10 +679,16 @@ class TotalizadorService {
     );
   }
 
-  pw.Widget _buildRodape({required Regional regional}) {
+  pw.Widget _buildRodape({required Regional regional, Usuario? chefeUniae}) {
     final dataAtual = DateTime.now();
     final dataFormatada =
         '${dataAtual.day.toString().padLeft(2, '0')}/${dataAtual.month.toString().padLeft(2, '0')}/${dataAtual.year}';
+
+    // Dados do chefe (com valores padrão se não encontrado)
+    final nomeChefeUniae = chefeUniae?.nome ?? 'Nome do Chefe UNIAE';
+    final matriculaChefeUniae =
+        chefeUniae?.matricula ?? 'Matrícula do Chefe UNIAE';
+    final cargoChefeUniae = 'Chefe UNIAE - ${regional.descricao.toUpperCase()}';
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
@@ -701,18 +715,12 @@ class TotalizadorService {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
+                  pw.Text(nomeChefeUniae, style: pw.TextStyle(fontSize: 10)),
                   pw.Text(
-                    'Nome chefe UNIAE',
+                    matriculaChefeUniae,
                     style: pw.TextStyle(fontSize: 10),
                   ),
-                  pw.Text(
-                    'Matrícula Chefe UNIAE',
-                    style: pw.TextStyle(fontSize: 10),
-                  ),
-                  pw.Text(
-                    'Chefe UNIAE - ${regional.descricao.toUpperCase()}',
-                    style: pw.TextStyle(fontSize: 10),
-                  ),
+                  pw.Text(cargoChefeUniae, style: pw.TextStyle(fontSize: 10)),
                 ],
               ),
             ),
@@ -758,6 +766,11 @@ class TotalizadorService {
     String? processoOrigem,
     String? observacoes,
   }) async {
+    // Buscar chefe da UNIAE da regional
+    final chefeUniae = await _usuarioService.getChefeUniaePorRegional(
+      regional.id,
+    );
+
     // Buscar todos os contratos da regional
     final contratos = await _contratoService.buscarContratosPorRegional(
       regional.id,
@@ -924,6 +937,8 @@ class TotalizadorService {
           _buildDetalhamentoPorContrato(dadosPorContrato),
           pw.SizedBox(height: 8),
           _buildObservacoes(observacoes ?? ''),
+          pw.SizedBox(height: 10),
+          _buildRodape(regional: regional, chefeUniae: chefeUniae),
         ],
       ),
     );
@@ -1020,7 +1035,10 @@ class TotalizadorService {
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: [
             _smallBox('TOTAL DE ALUNOS', totalAlunos.toString()),
-            _smallBox('TOTAL KM', totalKm.toStringAsFixed(1)),
+            _smallBox(
+              'TOTAL KM',
+              totalKm.toStringAsFixed(2).replaceAll('.', ','),
+            ),
             _smallBox(
               'VALOR TOTAL NOTA',
               money(valorTotalNota),

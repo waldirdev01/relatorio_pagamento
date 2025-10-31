@@ -74,11 +74,19 @@ class ReposicaoAulaService {
   }
 
   // Adicionar nova reposição
-  Future<String?> adicionarReposicao(ReposicaoAula reposicao) async {
+  Future<String?> adicionarReposicao(
+    ReposicaoAula reposicao,
+    String? usuarioId,
+  ) async {
     try {
+      // Adicionar ID do usuário que está criando
+      final reposicaoComUsuario = reposicao.copyWith(
+        usuarioCriacaoId: usuarioId,
+      );
+
       final docRef = await _firestore
           .collection(_collection)
-          .add(reposicao.toFirestore());
+          .add(reposicaoComUsuario.toFirestore());
       return docRef.id;
     } catch (e) {
       print('Erro ao adicionar reposição: $e');
@@ -87,16 +95,21 @@ class ReposicaoAulaService {
   }
 
   // Atualizar reposição existente
-  Future<bool> atualizarReposicao(ReposicaoAula reposicao) async {
+  Future<bool> atualizarReposicao(
+    ReposicaoAula reposicao,
+    String? usuarioId,
+  ) async {
     try {
       final reposicaoAtualizada = reposicao.copyWith(
         dataAtualizacao: DateTime.now(),
+        usuarioAtualizacaoId: usuarioId,
       );
 
       await _firestore
           .collection(_collection)
           .doc(reposicao.id)
           .update(reposicaoAtualizada.toFirestore());
+
       return true;
     } catch (e) {
       print('Erro ao atualizar reposição: $e');

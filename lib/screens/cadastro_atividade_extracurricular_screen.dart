@@ -7,6 +7,7 @@ import '../models/escola.dart';
 import '../models/regional.dart';
 import '../models/turno.dart';
 import '../services/atividade_extracurricular_service.dart';
+import '../services/auth_service.dart';
 import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
 import '../utils/currency_formatter.dart';
@@ -32,6 +33,7 @@ class _CadastroAtividadeExtracurricularScreenState
   final _atividadeService = AtividadeExtracurricularService();
   final _escolaService = EscolaService();
   final _contratoService = ContratoService();
+  final _authService = AuthService();
   bool _isLoading = false;
 
   // Controllers
@@ -903,10 +905,24 @@ class _CadastroAtividadeExtracurricularScreenState
 
       String? result;
       if (_isEditing) {
-        final success = await _atividadeService.atualizarAtividade(atividade);
+        // Obter usuário atual para registrar quem está editando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        final success = await _atividadeService.atualizarAtividade(
+          atividade,
+          usuarioId,
+        );
         result = success ? 'success' : null;
       } else {
-        result = await _atividadeService.adicionarAtividade(atividade);
+        // Obter usuário atual para registrar quem está criando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        result = await _atividadeService.adicionarAtividade(
+          atividade,
+          usuarioId,
+        );
       }
 
       if (mounted) {

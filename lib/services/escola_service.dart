@@ -98,6 +98,7 @@ class EscolaService {
           .collection(_collection)
           .doc(escola.id)
           .update(escolaAtualizada.toFirestore());
+
       return true;
     } catch (e) {
       print('Erro ao atualizar escola: $e');

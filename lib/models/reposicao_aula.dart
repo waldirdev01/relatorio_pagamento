@@ -23,6 +23,10 @@ class ReposicaoAula {
   final DateTime? dataSolicitacao;
   final DateTime? dataReposicao;
 
+  // Rastreamento de usuário
+  final String? usuarioCriacaoId; // Quem criou
+  final String? usuarioAtualizacaoId; // Quem fez a última atualização
+
   ReposicaoAula({
     required this.id,
     required this.itinerarioId,
@@ -38,6 +42,8 @@ class ReposicaoAula {
     this.observacoes,
     this.dataSolicitacao,
     this.dataReposicao,
+    this.usuarioCriacaoId,
+    this.usuarioAtualizacaoId,
   });
 
   // Construtor para criar Reposição a partir do Firestore
@@ -65,6 +71,8 @@ class ReposicaoAula {
       dataReposicao: data['dataReposicao'] != null
           ? DateTime.fromMillisecondsSinceEpoch(data['dataReposicao'])
           : null,
+      usuarioCriacaoId: data['usuarioCriacaoId'],
+      usuarioAtualizacaoId: data['usuarioAtualizacaoId'],
     );
   }
 
@@ -97,6 +105,12 @@ class ReposicaoAula {
     if (dataReposicao != null) {
       map['dataReposicao'] = dataReposicao!.millisecondsSinceEpoch;
     }
+    if (usuarioCriacaoId != null) {
+      map['usuarioCriacaoId'] = usuarioCriacaoId as String;
+    }
+    if (usuarioAtualizacaoId != null) {
+      map['usuarioAtualizacaoId'] = usuarioAtualizacaoId as String;
+    }
 
     return map;
   }
@@ -117,6 +131,8 @@ class ReposicaoAula {
     String? observacoes,
     DateTime? dataSolicitacao,
     DateTime? dataReposicao,
+    String? usuarioCriacaoId,
+    String? usuarioAtualizacaoId,
   }) {
     return ReposicaoAula(
       id: id ?? this.id,
@@ -133,6 +149,8 @@ class ReposicaoAula {
       observacoes: observacoes ?? this.observacoes,
       dataSolicitacao: dataSolicitacao ?? this.dataSolicitacao,
       dataReposicao: dataReposicao ?? this.dataReposicao,
+      usuarioCriacaoId: usuarioCriacaoId ?? this.usuarioCriacaoId,
+      usuarioAtualizacaoId: usuarioAtualizacaoId ?? this.usuarioAtualizacaoId,
     );
   }
 
@@ -150,6 +168,8 @@ class ReposicaoAula {
     String? observacoes,
     DateTime? dataSolicitacao,
     DateTime? dataReposicao,
+    String? usuarioCriacaoId,
+    String? usuarioAtualizacaoId,
   }) {
     final kmXNumeroOnibus = km * numeroOnibus;
     final kmXNumeroOnibusXDias = kmXNumeroOnibus * diasTrabalhados;
@@ -169,6 +189,8 @@ class ReposicaoAula {
       observacoes: observacoes,
       dataSolicitacao: dataSolicitacao,
       dataReposicao: dataReposicao,
+      usuarioCriacaoId: usuarioCriacaoId,
+      usuarioAtualizacaoId: usuarioAtualizacaoId,
     );
   }
 

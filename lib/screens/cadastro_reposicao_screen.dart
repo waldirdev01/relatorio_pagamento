@@ -5,6 +5,7 @@ import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/reposicao_aula.dart';
 import '../models/turno.dart';
+import '../services/auth_service.dart';
 import '../services/escola_service.dart';
 import '../services/reposicao_aula_service.dart';
 
@@ -29,6 +30,7 @@ class _CadastroReposicaoScreenState extends State<CadastroReposicaoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _reposicaoService = ReposicaoAulaService();
   final _escolaService = EscolaService();
+  final _authService = AuthService();
   bool _isLoading = false;
 
   // Controllers
@@ -429,7 +431,14 @@ class _CadastroReposicaoScreenState extends State<CadastroReposicaoScreen> {
       );
 
       if (_isEditing) {
-        final sucesso = await _reposicaoService.atualizarReposicao(reposicao);
+        // Obter usuário atual para registrar quem está editando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        final sucesso = await _reposicaoService.atualizarReposicao(
+          reposicao,
+          usuarioId,
+        );
         if (sucesso && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -447,7 +456,14 @@ class _CadastroReposicaoScreenState extends State<CadastroReposicaoScreen> {
           );
         }
       } else {
-        final id = await _reposicaoService.adicionarReposicao(reposicao);
+        // Obter usuário atual para registrar quem está criando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        final id = await _reposicaoService.adicionarReposicao(
+          reposicao,
+          usuarioId,
+        );
         if (id != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

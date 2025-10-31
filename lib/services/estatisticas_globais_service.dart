@@ -9,6 +9,7 @@ import '../services/atividade_extracurricular_service.dart';
 import '../services/contrato_service.dart';
 import '../services/itinerario_service.dart';
 import '../services/reposicao_aula_service.dart';
+import '../utils/app_logger.dart';
 import '../utils/currency_formatter.dart';
 
 class EstatisticasGlobaisService {
@@ -104,7 +105,11 @@ class EstatisticasGlobaisService {
         'ano': ano,
       };
     } catch (e) {
-      print('Erro ao calcular estatísticas globais: $e');
+      AppLogger.error(
+        'Erro ao calcular estatísticas globais: $e',
+        tag: 'ESTATISTICAS',
+        error: e,
+      );
       rethrow;
     }
   }

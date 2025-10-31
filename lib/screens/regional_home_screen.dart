@@ -192,6 +192,7 @@ class RegionalHomeScreen extends StatelessWidget {
               onTap: () => _navigateToTotalizadorRegional(context),
             ),
 
+
             const SizedBox(height: 32),
           ],
         ),
@@ -306,6 +307,8 @@ class RegionalHomeScreen extends StatelessWidget {
       ),
     );
   }
+
+
 
   Future<void> _fazerLogout(BuildContext context) async {
     try {

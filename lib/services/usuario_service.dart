@@ -104,14 +104,15 @@ class UsuarioService {
   }
 
   // Buscar usuário por ID
-  Future<Usuario?> getUsuarioPorId(String id) async {
+  Future<Usuario?> getUsuarioById(String id) async {
     try {
       final doc = await _firestore.collection(_collection).doc(id).get();
-      if (!doc.exists) return null;
-
-      return Usuario.fromMap({'id': doc.id, ...doc.data()!});
+      if (doc.exists) {
+        return Usuario.fromMap({'id': doc.id, ...?doc.data()});
+      }
+      return null;
     } catch (e) {
-      print('Erro ao buscar usuário por ID: $e');
+      print('Erro ao buscar usuário: $e');
       return null;
     }
   }
@@ -184,6 +185,28 @@ class UsuarioService {
     } catch (e) {
       print('Erro ao alterar status do usuário: $e');
       rethrow;
+    }
+  }
+
+  // Buscar chefe da UNIAE por regional
+  Future<Usuario?> getChefeUniaePorRegional(String regionalId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_collection)
+          .where('regionalId', isEqualTo: regionalId)
+          .where('tipoUsuario', isEqualTo: TipoUsuario.chefeUniae.name)
+          .where('statusAprovacao', isEqualTo: StatusAprovacao.aprovado.name)
+          .where('ativo', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) return null;
+
+      final doc = querySnapshot.docs.first;
+      return Usuario.fromMap({'id': doc.id, ...doc.data()});
+    } catch (e) {
+      print('Erro ao buscar chefe UNIAE por regional: $e');
+      return null;
     }
   }
 

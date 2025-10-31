@@ -55,6 +55,10 @@ class AtividadeExtracurricular {
   final DateTime? dataAtualizacao;
   final String? observacoes;
 
+  // Rastreamento de usuário
+  final String? usuarioCriacaoId; // Quem criou
+  final String? usuarioAtualizacaoId; // Quem fez a última atualização
+
   AtividadeExtracurricular({
     required this.id,
     required this.regionalId,
@@ -85,6 +89,8 @@ class AtividadeExtracurricular {
     required this.dataCriacao,
     this.dataAtualizacao,
     this.observacoes,
+    this.usuarioCriacaoId,
+    this.usuarioAtualizacaoId,
   });
 
   // Construtor para criar AtividadeExtracurricular a partir do Firestore
@@ -134,6 +140,8 @@ class AtividadeExtracurricular {
           ? DateTime.fromMillisecondsSinceEpoch(data['dataAtualizacao'])
           : null,
       observacoes: data['observacoes'],
+      usuarioCriacaoId: data['usuarioCriacaoId'],
+      usuarioAtualizacaoId: data['usuarioAtualizacaoId'],
     );
   }
 
@@ -171,6 +179,9 @@ class AtividadeExtracurricular {
       if (em != null) 'em': em,
       if (ee != null) 'ee': ee,
       if (eja != null) 'eja': eja,
+      if (usuarioCriacaoId != null) 'usuarioCriacaoId': usuarioCriacaoId,
+      if (usuarioAtualizacaoId != null)
+        'usuarioAtualizacaoId': usuarioAtualizacaoId,
     };
   }
 
@@ -205,6 +216,8 @@ class AtividadeExtracurricular {
     DateTime? dataCriacao,
     DateTime? dataAtualizacao,
     String? observacoes,
+    String? usuarioCriacaoId,
+    String? usuarioAtualizacaoId,
   }) {
     return AtividadeExtracurricular(
       id: id ?? this.id,
@@ -236,6 +249,8 @@ class AtividadeExtracurricular {
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataAtualizacao: dataAtualizacao ?? this.dataAtualizacao,
       observacoes: observacoes ?? this.observacoes,
+      usuarioCriacaoId: usuarioCriacaoId ?? this.usuarioCriacaoId,
+      usuarioAtualizacaoId: usuarioAtualizacaoId ?? this.usuarioAtualizacaoId,
     );
   }
 

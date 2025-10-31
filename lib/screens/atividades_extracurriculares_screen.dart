@@ -5,7 +5,10 @@ import '../models/escola.dart';
 import '../models/regional.dart';
 import '../models/turno.dart';
 import '../services/atividade_extracurricular_service.dart';
+import '../services/auth_service.dart';
 import '../services/escola_service.dart';
+import '../services/usuario_service.dart';
+import '../utils/app_logger.dart';
 import 'cadastro_atividade_extracurricular_screen.dart';
 
 class AtividadesExtracurricularesScreen extends StatefulWidget {
@@ -27,12 +30,17 @@ class _AtividadesExtracurricularesScreenState
     extends State<AtividadesExtracurricularesScreen> {
   final _atividadeService = AtividadeExtracurricularService();
   final _escolaService = EscolaService();
+  final _authService = AuthService();
+  final _usuarioService = UsuarioService();
   bool _isSelectionMode = false;
   final Set<String> _selectedAtividades = {};
 
   // Filtros de período
   int _mesSelecionado = DateTime.now().month;
   int _anoSelecionado = DateTime.now().year;
+
+  // Cache para usuários para evitar consultas repetidas
+  final Map<String, String> _usuarioCache = {};
   final List<String> _meses = [
     'Janeiro',
     'Fevereiro',
@@ -79,23 +87,20 @@ class _AtividadesExtracurricularesScreenState
                 widget.regional.id,
               ),
               builder: (context, snapshot) {
-                print(
-                  '📊 [ATIVIDADES-SCREEN] Estado: ${snapshot.connectionState}',
+                AppLogger.debug(
+                  'Estado: ${snapshot.connectionState}',
+                  tag: 'ATIVIDADES-SCREEN',
                 );
-                print('📊 [ATIVIDADES-SCREEN] Tem erro: ${snapshot.hasError}');
+                AppLogger.debug(
+                  'Tem erro: ${snapshot.hasError}',
+                  tag: 'ATIVIDADES-SCREEN',
+                );
                 if (snapshot.hasError) {
-                  print('');
-                  print(
-                    '🎯 ================ ATIVIDADES EXTRACURRICULARES - LINK AQUI! ================',
+                  AppLogger.error(
+                    'ATIVIDADES EXTRACURRICULARES - LINK AQUI! CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES: ${snapshot.error}',
+                    tag: 'ATIVIDADES-SCREEN',
+                    error: snapshot.error,
                   );
-                  print(
-                    '🔗 CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES:',
-                  );
-                  print('${snapshot.error}');
-                  print(
-                    '============================================================================',
-                  );
-                  print('');
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -507,6 +512,8 @@ class _AtividadesExtracurricularesScreenState
                   ),
                 if (atividade.motivoCancelamento != null)
                   _buildInfoRow('Motivo', atividade.motivoCancelamento!),
+                if (atividade.ei != null)
+                  _buildInfoRow('Alunos EI', atividade.ei.toString()),
                 if (atividade.ef != null)
                   _buildInfoRow('Alunos EF', atividade.ef.toString()),
                 if (atividade.em != null)
@@ -530,6 +537,71 @@ class _AtividadesExtracurricularesScreenState
                 ),
                 _buildInfoRow('Motoristas', atividade.motoristas),
                 _buildInfoRow('Monitoras', atividade.monitoras),
+
+                // Informações do usuário (criação e edição)
+                const SizedBox(height: 8),
+                FutureBuilder<String>(
+                  future: _obterInfoCriacaoAtividade(atividade),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_add,
+                              size: 14,
+                              color: Colors.blue[600],
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                snapshot.data!,
+                                style: TextStyle(
+                                  color: Colors.blue[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<String>(
+                  future: _obterInfoEdicaoAtividade(atividade),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: 14,
+                              color: Colors.orange[600],
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                snapshot.data!,
+                                style: TextStyle(
+                                  color: Colors.orange[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 const SizedBox(height: 16),
 
                 // Seção de escolas
@@ -849,6 +921,68 @@ class _AtividadesExtracurricularesScreenState
       ),
     );
   }
+
+  /// Obtém informações do usuário que criou/editou a atividade
+  Future<String> _obterInfoCriacaoAtividade(
+    AtividadeExtracurricular atividade,
+  ) async {
+    try {
+      if (atividade.usuarioCriacaoId == null) return '';
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[atividade.usuarioCriacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          atividade.usuarioCriacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[atividade.usuarioCriacaoId!] = nomeUsuario;
+      }
+
+      return 'Criado por $nomeUsuario em ${_formatarData(atividade.dataCriacao)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Obtém informações do usuário que editou a atividade
+  Future<String> _obterInfoEdicaoAtividade(
+    AtividadeExtracurricular atividade,
+  ) async {
+    try {
+      if (atividade.usuarioAtualizacaoId == null ||
+          atividade.dataAtualizacao == null) {
+        return '';
+      }
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[atividade.usuarioAtualizacaoId!] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(
+          atividade.usuarioAtualizacaoId!,
+        );
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[atividade.usuarioAtualizacaoId!] = nomeUsuario;
+      }
+
+      return 'Editado por $nomeUsuario em ${_formatarData(atividade.dataAtualizacao!)}';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /// Formatar data no padrão brasileiro
+  String _formatarData(DateTime data) {
+    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+  }
 }
 
 // Dialog para atualizar status de uma atividade
@@ -867,6 +1001,7 @@ class _StatusUpdateDialog extends StatefulWidget {
 
 class _StatusUpdateDialogState extends State<_StatusUpdateDialog> {
   final _atividadeService = AtividadeExtracurricularService();
+  final _authService = AuthService();
   late StatusAtividadeExtracurricular _novoStatus;
   final _codigoTcbController = TextEditingController();
   final _motivoController = TextEditingController();
@@ -1042,8 +1177,13 @@ class _StatusUpdateDialogState extends State<_StatusUpdateDialog> {
             : _motivoController.text.trim(),
       );
 
+      // Obter usuário atual para registrar quem está editando
+      final usuarioAtual = await _authService.getUsuarioAtual();
+      final usuarioId = usuarioAtual?.id;
+
       final success = await _atividadeService.atualizarAtividade(
         atividadeAtualizada,
+        usuarioId,
       );
 
       if (mounted) {
@@ -1090,6 +1230,7 @@ class _MultiStatusUpdateDialog extends StatefulWidget {
 
 class _MultiStatusUpdateDialogState extends State<_MultiStatusUpdateDialog> {
   final _atividadeService = AtividadeExtracurricularService();
+  final _authService = AuthService();
   StatusAtividadeExtracurricular _novoStatus =
       StatusAtividadeExtracurricular.criada;
   final _motivoController = TextEditingController();
@@ -1187,6 +1328,10 @@ class _MultiStatusUpdateDialogState extends State<_MultiStatusUpdateDialog> {
     try {
       int successCount = 0;
 
+      // Obter usuário atual para registrar quem está editando
+      final usuarioAtual = await _authService.getUsuarioAtual();
+      final usuarioId = usuarioAtual?.id;
+
       for (String atividadeId in widget.atividadeIds) {
         final atividade = await _atividadeService.getAtividadeById(atividadeId);
         if (atividade != null) {
@@ -1199,6 +1344,7 @@ class _MultiStatusUpdateDialogState extends State<_MultiStatusUpdateDialog> {
 
           final success = await _atividadeService.atualizarAtividade(
             atividadeAtualizada,
+            usuarioId,
           );
 
           if (success) successCount++;

@@ -91,11 +91,19 @@ class ItinerarioService {
   }
 
   // Adicionar novo itinerário
-  Future<String> adicionarItinerario(Itinerario itinerario) async {
+  Future<String> adicionarItinerario(
+    Itinerario itinerario,
+    String? usuarioId,
+  ) async {
     try {
+      // Adicionar ID do usuário que está criando
+      final itinerarioComUsuario = itinerario.copyWith(
+        usuarioCriacaoId: usuarioId,
+      );
+
       final docRef = await _firestore
           .collection(_collection)
-          .add(itinerario.toFirestore());
+          .add(itinerarioComUsuario.toFirestore());
       return docRef.id;
     } catch (e) {
       throw Exception('Erro ao adicionar itinerário: $e');
@@ -103,14 +111,21 @@ class ItinerarioService {
   }
 
   // Atualizar itinerário
-  Future<void> atualizarItinerario(Itinerario itinerario) async {
+  Future<void> atualizarItinerario(
+    Itinerario itinerario,
+    String? usuarioId,
+  ) async {
     try {
+      // Adicionar ID do usuário que está atualizando
+      final itinerarioAtualizado = itinerario.copyWith(
+        dataAtualizacao: DateTime.now(),
+        usuarioAtualizacaoId: usuarioId,
+      );
+
       await _firestore
           .collection(_collection)
           .doc(itinerario.id)
-          .update(
-            itinerario.copyWith(dataAtualizacao: DateTime.now()).toFirestore(),
-          );
+          .update(itinerarioAtualizado.toFirestore());
     } catch (e) {
       throw Exception('Erro ao atualizar itinerário: $e');
     }

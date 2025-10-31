@@ -6,6 +6,7 @@ import '../models/escola.dart';
 import '../models/itinerario.dart';
 import '../models/regional.dart';
 import '../models/turno.dart';
+import '../services/auth_service.dart';
 import '../services/contrato_service.dart';
 import '../services/escola_service.dart';
 import '../services/itinerario_service.dart';
@@ -31,6 +32,7 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
   final _itinerarioService = ItinerarioService();
   final _escolaService = EscolaService();
   final _contratoService = ContratoService();
+  final _authService = AuthService();
   bool _isLoading = false;
 
   // Controllers
@@ -795,7 +797,11 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
       ).calcularTotais();
 
       if (_isEditing) {
-        await _itinerarioService.atualizarItinerario(itinerario);
+        // Obter usuário atual para registrar quem está editando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        await _itinerarioService.atualizarItinerario(itinerario, usuarioId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -806,7 +812,11 @@ class _CadastroItinerarioScreenState extends State<CadastroItinerarioScreen> {
           Navigator.pop(context);
         }
       } else {
-        await _itinerarioService.adicionarItinerario(itinerario);
+        // Obter usuário atual para registrar quem está criando
+        final usuarioAtual = await _authService.getUsuarioAtual();
+        final usuarioId = usuarioAtual?.id;
+
+        await _itinerarioService.adicionarItinerario(itinerario, usuarioId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

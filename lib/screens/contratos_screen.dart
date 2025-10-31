@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/contrato.dart';
 import '../models/regional.dart';
 import '../services/contrato_service.dart';
+import '../utils/app_logger.dart';
 import '../utils/currency_formatter.dart';
 import 'cadastro_contrato_screen.dart';
 
@@ -20,8 +21,9 @@ class _ContratosScreenState extends State<ContratosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print(
-      '🏗️ [CONTRATOS-SCREEN] Construindo tela para regional: ${widget.regional.id}',
+    AppLogger.debug(
+      'Construindo tela para regional: ${widget.regional.id}',
+      tag: 'CONTRATOS-SCREEN',
     );
     return Scaffold(
       appBar: AppBar(
@@ -39,18 +41,26 @@ class _ContratosScreenState extends State<ContratosScreen> {
       body: StreamBuilder<List<Contrato>>(
         stream: _contratoService.listarContratosPorRegional(widget.regional.id),
         builder: (context, snapshot) {
-          print('📊 [CONTRATOS-SCREEN] Estado: ${snapshot.connectionState}');
-          print('📊 [CONTRATOS-SCREEN] Tem erro: ${snapshot.hasError}');
-          print('📊 [CONTRATOS-SCREEN] Erro: ${snapshot.error}');
+          AppLogger.debug(
+            'Estado: ${snapshot.connectionState}',
+            tag: 'CONTRATOS-SCREEN',
+          );
+          AppLogger.debug(
+            'Tem erro: ${snapshot.hasError}',
+            tag: 'CONTRATOS-SCREEN',
+          );
+          AppLogger.debug('Erro: ${snapshot.error}', tag: 'CONTRATOS-SCREEN');
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            print('⏳ [CONTRATOS-SCREEN] Aguardando dados...');
+            AppLogger.debug('Aguardando dados...', tag: 'CONTRATOS-SCREEN');
             return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            print(
-              '❌ [CONTRATOS-SCREEN] Erro no StreamBuilder: ${snapshot.error}',
+            AppLogger.error(
+              'Erro no StreamBuilder: ${snapshot.error}',
+              tag: 'CONTRATOS-SCREEN',
+              error: snapshot.error,
             );
             return Center(
               child: Column(
@@ -78,13 +88,15 @@ class _ContratosScreenState extends State<ContratosScreen> {
           }
 
           final contratos = snapshot.data ?? [];
-          print(
-            '📋 [CONTRATOS-SCREEN] Contratos recebidos: ${contratos.length}',
+          AppLogger.debug(
+            'Contratos recebidos: ${contratos.length}',
+            tag: 'CONTRATOS-SCREEN',
           );
 
           if (contratos.isEmpty) {
-            print(
-              '📭 [CONTRATOS-SCREEN] Nenhum contrato encontrado - mostrando tela vazia',
+            AppLogger.debug(
+              'Nenhum contrato encontrado - mostrando tela vazia',
+              tag: 'CONTRATOS-SCREEN',
             );
             return Center(
               child: Column(

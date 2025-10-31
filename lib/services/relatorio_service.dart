@@ -16,6 +16,11 @@ import 'escola_service.dart';
 class RelatorioService {
   final EscolaService _escolaService = EscolaService();
 
+  // Formatar número no padrão brasileiro (vírgula como decimal)
+  String _formatarNumero(double numero, {int casasDecimais = 2}) {
+    return numero.toStringAsFixed(casasDecimais).replaceAll('.', ',');
+  }
+
   // Gerar relatório PDF
   Future<Uint8List> gerarRelatorioPDF({
     required Regional regional,
@@ -272,20 +277,20 @@ class RelatorioService {
         itinerario.total.toString(),
         itinerario.numeroOnibus.toString(),
         itinerario.placas,
-        itinerario.km.toStringAsFixed(1), // KM regular
-        itinerario.kmXNumeroOnibus.toStringAsFixed(1), // KM X ÔNIBUS regular
+        _formatarNumero(itinerario.km), // KM regular
+        _formatarNumero(itinerario.kmXNumeroOnibus), // KM X ÔNIBUS regular
         itinerario.diasTrabalhados.toString(), // DIAS TRAB. regular
-        itinerario.kmXNumeroOnibusXDias.toStringAsFixed(
-          1,
+        _formatarNumero(
+          itinerario.kmXNumeroOnibusXDias,
         ), // KM X ÔNIBUS X DIAS regular
-        somaKmRepos.toStringAsFixed(1), // KM REPOSIÇÃO
+        _formatarNumero(somaKmRepos), // KM REPOSIÇÃO
         reposicoesDoItinerario.isNotEmpty
             ? reposicoesDoItinerario.map((r) => r.numeroOnibus).join(', ')
             : '', // Nº ÔNIBUS REPOSIÇÃO
-        somaKmXOnibusRepos.toStringAsFixed(1), // KM X ÔNIBUS REPOSIÇÃO
+        _formatarNumero(somaKmXOnibusRepos), // KM X ÔNIBUS REPOSIÇÃO
         somaDiasRepos.toString(), // DIAS TRAB. REPOSIÇÃO
-        somaKmXOnibusXDiasRepos.toStringAsFixed(
-          1,
+        _formatarNumero(
+          somaKmXOnibusXDiasRepos,
         ), // KM X ÔNIBUS X DIAS REPOSIÇÃO
         itinerario.motoristas,
         itinerario.monitoras,
@@ -319,18 +324,18 @@ class RelatorioService {
         atividade.total.toString(),
         atividade.numeroOnibus.toString(),
         atividade.placas,
-        '0', // KM regular (atividade extra não tem KM regular)
-        '0', // KM X ÔNIBUS regular
+        '0,00', // KM regular (atividade extra não tem KM regular)
+        '0,00', // KM X ÔNIBUS regular
         '0', // DIAS TRAB. regular
-        '0', // KM X ÔNIBUS X DIAS regular
-        atividade.km.toStringAsFixed(
-          1,
+        '0,00', // KM X ÔNIBUS X DIAS regular
+        _formatarNumero(
+          atividade.km,
         ), // KM REPOSIÇÃO (atividade extra vai aqui)
         atividade.numeroOnibus.toString(), // Nº ÔNIBUS REPOSIÇÃO
-        atividade.kmXNumeroOnibus.toStringAsFixed(1), // KM X ÔNIBUS REPOSIÇÃO
+        _formatarNumero(atividade.kmXNumeroOnibus), // KM X ÔNIBUS REPOSIÇÃO
         atividade.diasTrabalhados.toString(), // DIAS TRAB. REPOSIÇÃO
-        atividade.kmXNumeroOnibusXDias.toStringAsFixed(
-          1,
+        _formatarNumero(
+          atividade.kmXNumeroOnibusXDias,
         ), // KM X ÔNIBUS X DIAS REPOSIÇÃO
         atividade.motoristas,
         atividade.monitoras,
@@ -826,8 +831,8 @@ class RelatorioService {
 
     // Calcular KM DIÁRIO (01 veículo) = total KM X ÔNIBUS X DIAS regulares ÷ total dias regulares
     final kmDiarioPorVeiculo = totalDiasRegular > 0
-        ? (totalKmXOnibusXDiasRegular / totalDiasRegular).toStringAsFixed(1)
-        : '0.0';
+        ? _formatarNumero(totalKmXOnibusXDiasRegular / totalDiasRegular)
+        : '0,00';
 
     // Calcular KM DIÁRIO = total KM X ÔNIBUS X DIAS regulares ÷ total dias regulares ÷ total ônibus regulares
     final totalOnibusRegular = itinerarios.fold(
@@ -835,9 +840,10 @@ class RelatorioService {
       (sum, it) => sum + it.numeroOnibus,
     );
     final kmDiario = totalDiasRegular > 0 && totalOnibusRegular > 0
-        ? (totalKmXOnibusXDiasRegular / totalDiasRegular / totalOnibusRegular)
-              .toStringAsFixed(1)
-        : '0.0';
+        ? _formatarNumero(
+            totalKmXOnibusXDiasRegular / totalDiasRegular / totalOnibusRegular,
+          )
+        : '0,00';
 
     return {
       'totalEi': totalEi,
@@ -847,18 +853,18 @@ class RelatorioService {
       'totalEja': totalEja,
       'totalAlunos': totalAlunos,
       // KM REGULARES (para KM DIÁRIO e KM MENSAL)
-      'totalKm': totalKmRegular.toStringAsFixed(1),
-      'totalKmXOnibus': totalKmXOnibusRegular.toStringAsFixed(1),
+      'totalKm': _formatarNumero(totalKmRegular),
+      'totalKmXOnibus': _formatarNumero(totalKmXOnibusRegular),
       'totalDias': totalDiasRegular,
-      'totalKmXOnibusXDias': totalKmXOnibusXDiasRegular.toStringAsFixed(1),
+      'totalKmXOnibusXDias': _formatarNumero(totalKmXOnibusXDiasRegular),
       // KM DIÁRIO calculados
       'kmDiarioPorVeiculo': kmDiarioPorVeiculo,
       'kmDiario': kmDiario,
       // KM EXTRAS (para KM EXTRA) - soma KM X ÔNIBUS X DIAS das reposições + atividades extras
-      'totalKmExtra': totalKmXOnibusXDiasExtra.toStringAsFixed(1),
-      'totalKmXOnibusExtra': totalKmXOnibusExtra.toStringAsFixed(1),
+      'totalKmExtra': _formatarNumero(totalKmXOnibusXDiasExtra),
+      'totalKmXOnibusExtra': _formatarNumero(totalKmXOnibusExtra),
       'totalDiasExtra': totalDiasExtra,
-      'totalKmXOnibusXDiasExtra': totalKmXOnibusXDiasExtra.toStringAsFixed(1),
+      'totalKmXOnibusXDiasExtra': _formatarNumero(totalKmXOnibusXDiasExtra),
       'totalItinerarios': totalItinerarios,
       'totalCopias': totalCopias,
       'totalAtividades': atividadesFiltradas.length,

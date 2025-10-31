@@ -32,7 +32,7 @@ class RegionalService {
     }
   }
 
-  // Adicionar nova regional
+    // Adicionar nova regional
   Future<String> adicionarRegional(Regional regional) async {
     try {
       final docRef = await _firestore
@@ -44,7 +44,7 @@ class RegionalService {
     }
   }
 
-  // Atualizar regional
+    // Atualizar regional
   Future<void> atualizarRegional(Regional regional) async {
     try {
       await _firestore
@@ -58,7 +58,7 @@ class RegionalService {
     }
   }
 
-  // Excluir regional
+    // Excluir regional
   Future<void> excluirRegional(String id) async {
     try {
       await _firestore.collection(_collection).doc(id).delete();

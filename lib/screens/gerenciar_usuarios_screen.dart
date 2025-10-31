@@ -4,6 +4,7 @@ import '../models/regional.dart';
 import '../models/usuario.dart';
 import '../services/regional_service.dart';
 import '../services/usuario_service.dart';
+import '../utils/app_logger.dart';
 
 class GerenciarUsuariosScreen extends StatefulWidget {
   const GerenciarUsuariosScreen({super.key});
@@ -89,7 +90,11 @@ class _GerenciarUsuariosScreenState extends State<GerenciarUsuariosScreen>
 
         if (snapshot.hasError) {
           // Print do erro para debug
-          print('❌ [USUARIO] Erro no stream: ${snapshot.error}');
+          AppLogger.error(
+            'Erro no stream: ${snapshot.error}',
+            tag: 'USUARIO',
+            error: snapshot.error,
+          );
 
           return Center(
             child: Column(
@@ -144,7 +149,11 @@ class _GerenciarUsuariosScreenState extends State<GerenciarUsuariosScreen>
 
         if (snapshot.hasError) {
           // Print do erro para debug
-          print('❌ [USUARIO] Erro no stream: ${snapshot.error}');
+          AppLogger.error(
+            'Erro no stream: ${snapshot.error}',
+            tag: 'USUARIO',
+            error: snapshot.error,
+          );
 
           return Center(
             child: Column(
@@ -202,7 +211,11 @@ class _GerenciarUsuariosScreenState extends State<GerenciarUsuariosScreen>
 
         if (snapshot.hasError) {
           // Print do erro para debug
-          print('❌ [USUARIO] Erro no stream: ${snapshot.error}');
+          AppLogger.error(
+            'Erro no stream: ${snapshot.error}',
+            tag: 'USUARIO',
+            error: snapshot.error,
+          );
 
           return Center(
             child: Column(

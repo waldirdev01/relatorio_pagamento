@@ -38,6 +38,10 @@ class Itinerario {
   final String?
   itinerarioOriginalId; // ID do itinerário original (se for cópia)
 
+  // Rastreamento de usuário
+  final String? usuarioCriacaoId; // Quem criou
+  final String? usuarioAtualizacaoId; // Quem fez a última atualização
+
   Itinerario({
     required this.id,
     required this.regionalId,
@@ -64,6 +68,8 @@ class Itinerario {
     this.dataAtualizacao,
     this.isCopia = false,
     this.itinerarioOriginalId,
+    this.usuarioCriacaoId,
+    this.usuarioAtualizacaoId,
   });
 
   // Construtor para criar Itinerário a partir do Firestore
@@ -99,6 +105,8 @@ class Itinerario {
           : null,
       isCopia: data['isCopia'] ?? false,
       itinerarioOriginalId: data['itinerarioOriginalId'],
+      usuarioCriacaoId: data['usuarioCriacaoId'],
+      usuarioAtualizacaoId: data['usuarioAtualizacaoId'],
     );
   }
 
@@ -126,6 +134,9 @@ class Itinerario {
         'dataAtualizacao': dataAtualizacao!.millisecondsSinceEpoch,
       if (itinerarioOriginalId != null)
         'itinerarioOriginalId': itinerarioOriginalId,
+      if (usuarioCriacaoId != null) 'usuarioCriacaoId': usuarioCriacaoId,
+      if (usuarioAtualizacaoId != null)
+        'usuarioAtualizacaoId': usuarioAtualizacaoId,
       if (ei != null) 'ei': ei,
       if (ef != null) 'ef': ef,
       if (em != null) 'em': em,
@@ -161,6 +172,8 @@ class Itinerario {
     DateTime? dataAtualizacao,
     bool? isCopia,
     String? itinerarioOriginalId,
+    String? usuarioCriacaoId,
+    String? usuarioAtualizacaoId,
   }) {
     return Itinerario(
       id: id ?? this.id,
@@ -188,6 +201,8 @@ class Itinerario {
       dataAtualizacao: dataAtualizacao ?? this.dataAtualizacao,
       isCopia: isCopia ?? this.isCopia,
       itinerarioOriginalId: itinerarioOriginalId ?? this.itinerarioOriginalId,
+      usuarioCriacaoId: usuarioCriacaoId ?? this.usuarioCriacaoId,
+      usuarioAtualizacaoId: usuarioAtualizacaoId ?? this.usuarioAtualizacaoId,
     );
   }
 

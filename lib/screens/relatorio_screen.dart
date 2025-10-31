@@ -57,7 +57,7 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
         title: Text('Relatório - ${widget.contrato.nome}'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

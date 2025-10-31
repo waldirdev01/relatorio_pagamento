@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/atividade_extracurricular.dart';
+import '../utils/app_logger.dart';
 
 class AtividadeExtracurricularService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -11,9 +12,13 @@ class AtividadeExtracurricularService {
     String regionalId,
   ) {
     try {
-      print('🔍 [ATIVIDADE] Consultando por regionalId: $regionalId');
-      print(
-        '📋 [ATIVIDADE] Query: collection($_collection).where(regionalId == $regionalId).orderBy(dataCriacao, descending: true)',
+      AppLogger.debug(
+        'Consultando por regionalId: $regionalId',
+        tag: 'ATIVIDADE',
+      );
+      AppLogger.debug(
+        'Query: collection($_collection).where(regionalId == $regionalId).orderBy(dataCriacao, descending: true)',
+        tag: 'ATIVIDADE',
       );
 
       return _firestore
@@ -25,8 +30,9 @@ class AtividadeExtracurricularService {
           ) // ⚠️ Vai gerar erro com link para criar índice
           .snapshots()
           .map((snapshot) {
-            print(
-              '📊 [ATIVIDADE] Atividades encontradas: ${snapshot.docs.length}',
+            AppLogger.debug(
+              'Atividades encontradas: ${snapshot.docs.length}',
+              tag: 'ATIVIDADE',
             );
             return snapshot.docs
                 .map(
@@ -38,16 +44,11 @@ class AtividadeExtracurricularService {
                 .toList();
           });
     } catch (e) {
-      print('');
-      print(
-        '🎯 ==================== ATIVIDADES - AQUI ESTÁ O LINK! ====================',
+      AppLogger.error(
+        'ATIVIDADES - AQUI ESTÁ O LINK! CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES: $e',
+        tag: 'ATIVIDADE',
+        error: e,
       );
-      print('🔗 CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES:');
-      print('$e');
-      print(
-        '======================================================================',
-      );
-      print('');
       // Fallback sem orderBy
       return _firestore
           .collection(_collection)
@@ -62,6 +63,7 @@ class AtividadeExtracurricularService {
                   ),
                 )
                 .toList();
+            // Ordenar localmente
             atividades.sort((a, b) => b.dataCriacao.compareTo(a.dataCriacao));
             return atividades;
           });
@@ -89,7 +91,11 @@ class AtividadeExtracurricularService {
 
       return atividades;
     } catch (e) {
-      print('Erro ao buscar atividades: $e');
+      AppLogger.error(
+        'Erro ao buscar atividades: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return [];
     }
   }
@@ -99,9 +105,13 @@ class AtividadeExtracurricularService {
     String contratoId,
   ) {
     try {
-      print('🔍 [ATIVIDADE-CONTRATO] Consultando por contratoId: $contratoId');
-      print(
-        '📋 [ATIVIDADE-CONTRATO] Query: collection($_collection).where(contratoId == $contratoId).orderBy(dataCriacao, descending: true)',
+      AppLogger.debug(
+        'Consultando por contratoId: $contratoId',
+        tag: 'ATIVIDADE-CONTRATO',
+      );
+      AppLogger.debug(
+        'Query: collection($_collection).where(contratoId == $contratoId).orderBy(dataCriacao, descending: true)',
+        tag: 'ATIVIDADE-CONTRATO',
       );
 
       return _firestore
@@ -113,8 +123,9 @@ class AtividadeExtracurricularService {
           ) // ⚠️ Vai gerar erro com link para criar índice
           .snapshots()
           .map((snapshot) {
-            print(
-              '📊 [ATIVIDADE-CONTRATO] Atividades encontradas: ${snapshot.docs.length}',
+            AppLogger.debug(
+              'Atividades encontradas: ${snapshot.docs.length}',
+              tag: 'ATIVIDADE-CONTRATO',
             );
             return snapshot.docs
                 .map(
@@ -126,18 +137,11 @@ class AtividadeExtracurricularService {
                 .toList();
           });
     } catch (e) {
-      print('');
-      print(
-        '🎯 ================ ATIVIDADES POR CONTRATO - AQUI ESTÁ O LINK! ================',
+      AppLogger.error(
+        'ATIVIDADES POR CONTRATO - AQUI ESTÁ O LINK! CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES POR CONTRATO: $e',
+        tag: 'ATIVIDADE-CONTRATO',
+        error: e,
       );
-      print(
-        '🔗 CLIQUE NESTE LINK PARA CRIAR O ÍNDICE DE ATIVIDADES POR CONTRATO:',
-      );
-      print('$e');
-      print(
-        '==============================================================================',
-      );
-      print('');
       // Fallback sem orderBy
       return _firestore
           .collection(_collection)
@@ -190,7 +194,11 @@ class AtividadeExtracurricularService {
 
       return atividades;
     } catch (e) {
-      print('Erro ao buscar atividades por período: $e');
+      AppLogger.error(
+        'Erro ao buscar atividades por período: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return [];
     }
   }
@@ -204,38 +212,63 @@ class AtividadeExtracurricularService {
       }
       return null;
     } catch (e) {
-      print('Erro ao buscar atividade: $e');
+      AppLogger.error(
+        'Erro ao buscar atividade: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return null;
     }
   }
 
   // Adicionar nova atividade
-  Future<String?> adicionarAtividade(AtividadeExtracurricular atividade) async {
+  Future<String?> adicionarAtividade(
+    AtividadeExtracurricular atividade,
+    String? usuarioId,
+  ) async {
     try {
+      // Adicionar ID do usuário que está criando
+      final atividadeComUsuario = atividade.copyWith(
+        usuarioCriacaoId: usuarioId,
+      );
+
       final docRef = await _firestore
           .collection(_collection)
-          .add(atividade.toFirestore());
+          .add(atividadeComUsuario.toFirestore());
       return docRef.id;
     } catch (e) {
-      print('Erro ao adicionar atividade: $e');
+      AppLogger.error(
+        'Erro ao adicionar atividade: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return null;
     }
   }
 
   // Atualizar atividade existente
-  Future<bool> atualizarAtividade(AtividadeExtracurricular atividade) async {
+  Future<bool> atualizarAtividade(
+    AtividadeExtracurricular atividade,
+    String? usuarioId,
+  ) async {
     try {
       final atividadeAtualizada = atividade.copyWith(
         dataAtualizacao: DateTime.now(),
+        usuarioAtualizacaoId: usuarioId,
       );
 
       await _firestore
           .collection(_collection)
           .doc(atividade.id)
           .update(atividadeAtualizada.toFirestore());
+
       return true;
     } catch (e) {
-      print('Erro ao atualizar atividade: $e');
+      AppLogger.error(
+        'Erro ao atualizar atividade: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return false;
     }
   }
@@ -246,7 +279,11 @@ class AtividadeExtracurricularService {
       await _firestore.collection(_collection).doc(id).delete();
       return true;
     } catch (e) {
-      print('Erro ao excluir atividade: $e');
+      AppLogger.error(
+        'Erro ao excluir atividade: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return false;
     }
   }
@@ -271,7 +308,11 @@ class AtividadeExtracurricularService {
 
       return snapshot.docs.isNotEmpty;
     } catch (e) {
-      print('Erro ao verificar atividade existente: $e');
+      AppLogger.error(
+        'Erro ao verificar atividade existente: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return false;
     }
   }
@@ -305,7 +346,11 @@ class AtividadeExtracurricularService {
         'totalKmXDias': totalKmXDias,
       };
     } catch (e) {
-      print('Erro ao buscar estatísticas de atividades: $e');
+      AppLogger.error(
+        'Erro ao buscar estatísticas de atividades: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       return {
         'totalAtividades': 0,
         'totalAlunos': 0,
@@ -322,7 +367,10 @@ class AtividadeExtracurricularService {
     required int ano,
   }) async {
     try {
-      print('🔍 [ATIVIDADE] Buscando atividades por contrato: $contratoId');
+      AppLogger.debug(
+        'Buscando atividades por contrato: $contratoId',
+        tag: 'ATIVIDADE',
+      );
 
       // Buscar todas as atividades do contrato (sem filtro de data no Firestore)
       final snapshot = await _firestore
@@ -353,15 +401,21 @@ class AtividadeExtracurricularService {
         ),
       );
 
-      print(
-        '📊 [ATIVIDADE] Total atividades do contrato: ${todasAtividades.length}',
+      AppLogger.debug(
+        'Total atividades do contrato: ${todasAtividades.length}',
+        tag: 'ATIVIDADE',
       );
-      print(
-        '📊 [ATIVIDADE] Atividades filtradas por período $mes/$ano: ${atividadesFiltradas.length}',
+      AppLogger.debug(
+        'Atividades filtradas por período $mes/$ano: ${atividadesFiltradas.length}',
+        tag: 'ATIVIDADE',
       );
       return atividadesFiltradas;
     } catch (e) {
-      print('❌ [ATIVIDADE] Erro ao buscar atividades por contrato/período: $e');
+      AppLogger.error(
+        'Erro ao buscar atividades por contrato/período: $e',
+        tag: 'ATIVIDADE',
+        error: e,
+      );
       throw Exception('Erro ao buscar atividades por contrato/período: $e');
     }
   }

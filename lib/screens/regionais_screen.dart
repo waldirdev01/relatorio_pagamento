@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/regional.dart';
 import '../models/status_relatorio_regional.dart';
+import '../services/auth_service.dart';
 import '../services/regional_service.dart';
 import '../services/status_relatorio_service.dart';
+import '../services/usuario_service.dart';
 import 'cadastro_regional_screen.dart';
 import 'regional_home_screen.dart';
 
@@ -17,9 +19,15 @@ class RegionaisScreen extends StatefulWidget {
 class _RegionaisScreenState extends State<RegionaisScreen> {
   final RegionalService _regionalService = RegionalService();
   final StatusRelatorioService _statusService = StatusRelatorioService();
+  final UsuarioService _usuarioService = UsuarioService();
+  final AuthService _authService = AuthService();
 
   int _mesSelecionado = DateTime.now().month;
   int _anoSelecionado = DateTime.now().year;
+  int _refreshKey = 0; // Chave para forçar atualização
+
+  // Cache para usuários para evitar consultas repetidas
+  final Map<String, String> _usuarioCache = {};
 
   final _meses = const [
     'Janeiro',
@@ -35,6 +43,16 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
     'Novembro',
     'Dezembro',
   ];
+
+  /// Força atualização imediata da interface
+  void _forcarAtualizacao() {
+    if (mounted) {
+      setState(() {
+        _refreshKey++;
+        _usuarioCache.clear();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,9 +113,11 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
                             _meses[_mesSelecionado - 1],
                             _meses,
                             (val) {
-                              setState(
-                                () => _mesSelecionado = _meses.indexOf(val) + 1,
-                              );
+                              setState(() {
+                                _mesSelecionado = _meses.indexOf(val) + 1;
+                              });
+                              // Forçar atualização imediata
+                              _forcarAtualizacao();
                             },
                           ),
                         ),
@@ -111,7 +131,11 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
                               (i) => (DateTime.now().year - 5 + i).toString(),
                             ),
                             (val) {
-                              setState(() => _anoSelecionado = int.parse(val));
+                              setState(() {
+                                _anoSelecionado = int.parse(val);
+                              });
+                              // Forçar atualização imediata
+                              _forcarAtualizacao();
                             },
                           ),
                         ),
@@ -226,14 +250,15 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
   Widget _buildRegionalCard(BuildContext context, Regional regional) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
-      child: StreamBuilder<StatusRelatorioRegional?>(
-        stream: _statusService
-            .getStatusPorRegionalMesAno(
-              regionalId: regional.id,
-              mes: _mesSelecionado,
-              ano: _anoSelecionado,
-            )
-            .asStream(),
+      child: FutureBuilder<StatusRelatorioRegional?>(
+        key: ValueKey(
+          '${regional.id}_${_mesSelecionado}_${_anoSelecionado}_$_refreshKey',
+        ),
+        future: _statusService.getStatusPorRegionalMesAno(
+          regionalId: regional.id,
+          mes: _mesSelecionado,
+          ano: _anoSelecionado,
+        ),
         builder: (context, statusSnapshot) {
           final status = statusSnapshot.data;
 
@@ -305,45 +330,102 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
                     ),
                   ],
                 ),
+                // Informações de quem alterou o status
+                if (status != null) ...[
+                  const SizedBox(height: 4),
+                  FutureBuilder<String>(
+                    key: ValueKey(
+                      '${status.id}_${status.dataAlteracao.millisecondsSinceEpoch}_$_refreshKey',
+                    ),
+                    future: _obterInfoAlteracao(status),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                        return Row(
+                          children: [
+                            Icon(
+                              Icons.person,
+                              size: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                snapshot.data!,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.5),
+                                      fontSize: 11,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
               ],
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Botão para alterar status
-                IconButton(
-                  onPressed: () => _showStatusDialog(context, regional, status),
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Alterar Status',
-                ),
-                // Menu de opções
-                PopupMenuButton<String>(
-                  onSelected: (value) =>
-                      _handleMenuAction(context, value, regional),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit),
-                          SizedBox(width: 8),
-                          Text('Editar'),
-                        ],
-                      ),
+            trailing: SizedBox(
+              width: 80, // Largura fixa para evitar overflow
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Botão para alterar status
+                  IconButton(
+                    onPressed: () =>
+                        _showStatusDialog(context, regional, status),
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Alterar Status',
+                    padding: const EdgeInsets.all(4), // Reduzir padding
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
                     ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Excluir', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
+                  ),
+                  // Menu de opções
+                  PopupMenuButton<String>(
+                    onSelected: (value) =>
+                        _handleMenuAction(context, value, regional),
+                    padding: const EdgeInsets.all(4), // Reduzir padding
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
                     ),
-                  ],
-                ),
-              ],
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit),
+                            SizedBox(width: 8),
+                            Text('Editar'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text(
+                              'Excluir',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             onTap: () => _navigateToRegionalHome(context, regional),
           );
@@ -443,6 +525,38 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  Future<String> _obterInfoAlteracao(StatusRelatorioRegional status) async {
+    try {
+      // Se o usuárioId é 'usuario_temporario', não mostrar informações
+      if (status.usuarioId == 'usuario_temporario') {
+        return '';
+      }
+
+      // Verificar cache primeiro
+      String nomeUsuario = _usuarioCache[status.usuarioId] ?? '';
+
+      // Se não estiver no cache, buscar no banco
+      if (nomeUsuario.isEmpty) {
+        final usuario = await _usuarioService.getUsuarioById(status.usuarioId);
+        nomeUsuario = usuario?.nome ?? 'Usuário desconhecido';
+
+        // Adicionar ao cache
+        _usuarioCache[status.usuarioId] = nomeUsuario;
+      }
+
+      final dataFormatada = _formatDate(status.dataAlteracao);
+      final horaFormatada = _formatTime(status.horaAlteracao);
+
+      return 'Alterado por $nomeUsuario em $dataFormatada às $horaFormatada';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  String _formatTime(DateTime dateTime) {
+    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _buildDropdown(
@@ -570,9 +684,9 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
     StatusRelatorio novoStatus,
   ) async {
     try {
-      // TODO: Implementar sistema de usuário
-      // Por enquanto, usando um ID temporário
-      const usuarioId = 'usuario_temporario';
+      // Obter usuário atual logado
+      final usuarioAtual = await _authService.getUsuarioAtual();
+      final usuarioId = usuarioAtual?.id ?? 'usuario_temporario';
 
       await _statusService.alterarStatus(
         regionalId: regional.id,
@@ -582,7 +696,14 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
         usuarioId: usuarioId,
       );
 
-      if (mounted) {
+      // Aguardar um pouco para garantir que a escrita no banco foi concluída
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Forçar atualização da tela imediatamente
+      _forcarAtualizacao();
+
+      // Mostrar mensagem de sucesso
+      if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -593,7 +714,8 @@ class _RegionaisScreenState extends State<RegionaisScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      // Mostrar erro imediatamente
+      if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao alterar status: $e'),
